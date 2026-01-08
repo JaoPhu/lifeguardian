@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { AiAnalysisService } from './services/AiAnalysisService';
 import PhoneFrame from './components/PhoneFrame';
 import DemoSetup from './components/DemoSetup';
@@ -7,6 +7,7 @@ import SplashScreen from './components/auth/SplashScreen';
 import LoginScreen from './components/auth/LoginScreen';
 import Dashboard from './components/dashboard/Dashboard';
 import EventsScreen from './components/EventsScreen';
+import StatusScreen, { MonitorStatus } from './components/StatusScreen';
 import BottomNav from './components/layout/BottomNav';
 import { VideoConfig, SimulationEvent, Camera } from './types';
 import { Loader2 } from 'lucide-react';
@@ -22,6 +23,13 @@ function App() {
     // Data State
     const [currentConfig, setCurrentConfig] = useState<VideoConfig | null>(null);
     const [events, setEvents] = useState<SimulationEvent[]>([]);
+
+    // Refs for stable callbacks
+    const eventsRef = useRef(events);
+    const configRef = useRef(currentConfig);
+
+    useEffect(() => { eventsRef.current = events; }, [events]);
+    useEffect(() => { configRef.current = currentConfig; }, [currentConfig]);
 
     // AI Analysis State
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -63,27 +71,30 @@ function App() {
         }
     };
 
-    const handleStopSimulation = () => {
+    const handleStopSimulation = useCallback(() => {
         // When stopped (or finished), we save the session as a new "Camera" source
-        if (currentConfig) {
-            const newCamera: Camera = {
-                id: crypto.randomUUID(),
-                name: currentConfig.cameraName,
-                source: 'demo',
-                status: 'online', // Or 'offline' if completed? Let's say online showing last state
-                events: [...events],
-                config: currentConfig
-            };
-            setCameras(prev => [newCamera, ...prev]);
+        const finalConfig = configRef.current;
+        if (finalConfig) {
+            setCameras(prev => {
+                const newCamera: Camera = {
+                    id: crypto.randomUUID(),
+                    name: finalConfig.cameraName,
+                    source: 'demo',
+                    status: 'online',
+                    events: [...eventsRef.current], // Read from ref
+                    config: finalConfig
+                };
+                return [newCamera, ...prev];
+            });
         }
 
         setSimulationState('setup');
-        setIsDemoActive(false); // Return to dashboard
-    };
+        setIsDemoActive(false);
+    }, []); // No dependencies! Stable forever.
 
-    const handleValidationEvent = (event: SimulationEvent) => {
+    const handleValidationEvent = useCallback((event: SimulationEvent) => {
         setEvents(prev => [event, ...prev]);
-    };
+    }, []);
 
     const handleTryDemo = () => {
         setIsDemoActive(true);
@@ -178,11 +189,44 @@ function App() {
                     )}
 
                     {/* Placeholders for other tabs */}
-                    {(activeTab === 'status' || activeTab === 'layout' || activeTab === 'users' || activeTab === 'settings') && (
+                    {/* Status Tab */}
+                    {activeTab === 'status' && (
+                        (() => {
+                            // Derive status from the LAST applied config (or current one)
+                            // If no config has ever run, it is 'none'.
+                            // However, we want to retain the status after "Try Demo".
+                            // Status depends on the Camera list? The user said "from data demo".
+                            // Let's use the most recent 'demo' source camera or currentConfig.
+
+                            // Strategy: Find the latest 'demo' camera.
+                            // Actually, cameras are prepended, so cameras[0] might be it if it is demo.
+                            // Let's search for the first camera with source='demo'.
+                            const demoCam = cameras.find(c => c.source === 'demo');
+
+                            let status: MonitorStatus = 'none';
+                            let config = demoCam?.config || null;
+
+                            if (demoCam && demoCam.config) {
+                                if (demoCam.config.eventType === 'falling') status = 'emergency';
+                                else if (demoCam.config.eventType === 'sitting') status = 'warning';
+                                else if (demoCam.config.eventType === 'laying') status = 'normal'; // Mapping laying to normal as decided
+                                else status = 'normal';
+                            }
+
+                            return (
+                                <StatusScreen
+                                    status={status}
+                                    events={demoCam?.events || []}
+                                    config={config}
+                                />
+                            );
+                        })()
+                    )}
+
+                    {/* Placeholders for other tabs */}
+                    {(activeTab === 'layout' || activeTab === 'users' || activeTab === 'settings') && (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 font-bold p-6 text-center">
-                            <span className="text-4xl mb-4">
-                                {activeTab === 'status' ? '🛡️' : '🚧'}
-                            </span>
+                            <span className="text-4xl mb-4">🚧</span>
                             <p className="text-gray-900 font-bold mb-2 capitalize">{activeTab} Feature</p>
                             <p className="text-xs">Coming Soon</p>
                         </div>

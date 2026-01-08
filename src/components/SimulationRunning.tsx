@@ -28,9 +28,9 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
     }, [config.startTime, config.date]);
 
     // DERIVED Current Time (No longer state, avoids desync)
-    // Formula: Start + (RealSeconds * Speed * 1000ms)
-    // 1 Real Sec = 1 Sim Sec * Speed
-    const currentTime = new Date(startDateTime.getTime() + (videoTimeSec * config.speed * 1000));
+    // Formula: Start + (RealSeconds * Speed * 60 * 1000ms)
+    // 1 Real Sec = 1 Sim Minute * Speed
+    const currentTime = new Date(startDateTime.getTime() + (videoTimeSec * config.speed * 60 * 1000));
 
     const [stickmanPosture, setStickmanPosture] = useState<'standing' | 'sitting' | 'laying' | 'falling'>('standing');
     const [hasTriggeredEvent, setHasTriggeredEvent] = useState(false);
@@ -101,7 +101,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
     // 3. Sitting Time Calculation (Triggered by videoTimeSec changes)
     useEffect(() => {
         if (videoTimeSec > 0) {
-            const simulationSecondsPassed = 1 * config.speed; // approx per real sec
+            const simulationSecondsPassed = 60 * config.speed; // 1 Real Sec = X Sim Minutes (Speed)
             // Note: In video mode causing rapid updates, this might be too fast?
             // onTimeUpdate fires ~4Hz. We should check delta?
             // For simplicity in this demo, let's just increment if posture is sitting.
@@ -291,7 +291,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                     </div>
 
                     <div className="text-[10px] text-gray-500 font-bold mb-4">
-                        One second equals {config.speed} seconds.
+                        One second equals {config.speed} minutes.
                     </div>
 
                     <button

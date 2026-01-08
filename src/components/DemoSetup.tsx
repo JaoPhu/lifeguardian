@@ -47,7 +47,7 @@ const DemoSetup: React.FC<DemoSetupProps> = ({ onStart }) => {
     return (
         <div className="flex flex-col h-full bg-white relative">
             {/* Header */}
-            <div className="bg-primary-700 pt-14 pb-12 px-6 relative z-10 w-full">
+            <div className="bg-[#0D9488] pt-14 pb-12 px-6 relative z-10 w-full">
                 <div className="flex justify-between items-center">
                     <h1 className="text-2xl font-bold text-white tracking-wide">Demo</h1>
                     <div className="flex items-center gap-4">
@@ -65,7 +65,7 @@ const DemoSetup: React.FC<DemoSetupProps> = ({ onStart }) => {
                 {/* Video Upload Card */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-1">
                     <div className="px-3 py-2">
-                        <span className="text-primary-600 font-bold text-sm">Video</span>
+                        <span className="text-[#0D9488] font-bold text-sm">Video</span>
                     </div>
                     {/* Hidden Input */}
                     <input
@@ -96,12 +96,12 @@ const DemoSetup: React.FC<DemoSetupProps> = ({ onStart }) => {
 
                 {/* Camera Name */}
                 <div className="space-y-1">
-                    <label className="text-primary-600 font-bold text-sm ml-1">Name Camera</label>
+                    <label className="text-[#0D9488] font-bold text-sm ml-1">Name Camera</label>
                     <input
                         type="text"
                         value={cameraName}
                         onChange={(e) => setCameraName(e.target.value)}
-                        className="w-full bg-gray-100 rounded-xl px-4 py-3 text-gray-500 font-medium border-none outline-none focus:ring-1 focus:ring-primary-500"
+                        className="w-full bg-gray-100 rounded-xl px-4 py-3 text-gray-500 font-medium border-none outline-none focus:ring-1 focus:ring-[#0D9488]"
                     />
                 </div>
 
@@ -150,7 +150,7 @@ const DemoSetup: React.FC<DemoSetupProps> = ({ onStart }) => {
                             className={clsx(
                                 "flex-1 py-3 rounded-lg font-bold text-sm capitalize shadow-sm transition-all active:scale-95",
                                 eventType === type
-                                    ? "bg-primary-700 text-white shadow-md shadow-primary-700/20"
+                                    ? "bg-[#0D9488] text-white shadow-md shadow-[#0D9488]/20"
                                     : "bg-gray-100 text-gray-400 hover:bg-gray-200"
                             )}
                         >
@@ -163,7 +163,7 @@ const DemoSetup: React.FC<DemoSetupProps> = ({ onStart }) => {
                 <div className="pt-4 pb-2">
                     <button
                         onClick={handleStart}
-                        className="w-full bg-primary-700 hover:bg-primary-800 text-white text-xl font-bold py-4 rounded-xl shadow-lg shadow-primary-700/30 transition-transform active:scale-[0.98]"
+                        className="w-full bg-[#0D9488] hover:bg-[#0b7e73] text-white text-xl font-bold py-4 rounded-xl shadow-lg shadow-[#0D9488]/30 transition-transform active:scale-[0.98]"
                     >
                         Play
                     </button>
