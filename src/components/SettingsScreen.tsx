@@ -46,7 +46,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, isDarkMode,
 
             {/* Profile Card Container */}
             <div className={clsx("px-6 -mt-0 pt-6 pb-4 z-10 transition-colors duration-300", isDarkMode ? "bg-gray-900" : "bg-[#FAFAFA]")}>
-                <div className={clsx("rounded-[1.5rem] p-4 shadow-lg flex items-center gap-4 transition-colors duration-300", isDarkMode ? "bg-gray-800" : "bg-white")}>
+                <div
+                    onClick={() => onNavigate('profile')}
+                    className={clsx("rounded-[1.5rem] p-4 shadow-lg flex items-center gap-4 transition-colors duration-300 cursor-pointer hover:bg-opacity-90", isDarkMode ? "bg-gray-800" : "bg-white")}
+                >
                     <div className={clsx("w-16 h-16 rounded-full overflow-hidden border-2 shadow-inner", isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-100")}>
                         <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
                     </div>

@@ -6,6 +6,7 @@ import { SimulationEvent } from '../../types';
 
 interface StatisticsScreenProps {
     events: SimulationEvent[];
+    onOpenProfile?: () => void;
 }
 
 // Custom Label for Weekly Chart Alert
@@ -25,7 +26,7 @@ const renderCustomAlert = (props: any) => {
     return null;
 };
 
-const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events }) => {
+const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfile }) => {
     // Mock Data
     const [selectedDate, setSelectedDate] = useState(new Date()); // Start at Today
     const [currentMonth, setCurrentMonth] = useState(new Date()); // State for currently viewed month
@@ -179,7 +180,10 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events }) => {
                 <h1 className="text-3xl font-bold tracking-wide text-white">Statistics</h1>
                 <div className="flex items-center gap-4">
                     <Bell className="w-6 h-6 text-white fill-current" />
-                    <div className="w-9 h-9 bg-yellow-100 rounded-full border-2 border-white overflow-hidden">
+                    <div
+                        className="w-9 h-9 bg-yellow-100 rounded-full border-2 border-white overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={onOpenProfile}
+                    >
                         <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" className="w-full h-full" />
                     </div>
                 </div>

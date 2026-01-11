@@ -11,10 +11,11 @@ interface StatusScreenProps {
     config: VideoConfig | null;
     onShowStatistics: () => void;
     onOpenNotifications?: () => void;
+    onOpenProfile?: () => void;
     hasUnread?: boolean;
 }
 
-const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStatistics, onOpenNotifications, hasUnread }) => {
+const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStatistics, onOpenNotifications, onOpenProfile, hasUnread }) => {
 
     // Helper to determine styles and content based on status
     const getStatusConfig = () => {
@@ -76,7 +77,10 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                             <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0D9488]"></div>
                         )}
                     </div>
-                    <div className="w-9 h-9 bg-yellow-100 rounded-full border-2 border-white overflow-hidden">
+                    <div
+                        className="w-9 h-9 bg-yellow-100 rounded-full border-2 border-white overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={onOpenProfile}
+                    >
                         <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" className="w-full h-full" />
                     </div>
                 </div>

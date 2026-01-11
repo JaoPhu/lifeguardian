@@ -17,11 +17,12 @@ import AIDebugScreen from './components/AIDebugScreen';
 import NotificationScreen from './components/notification/NotificationScreen';
 import clsx from 'clsx';
 import GroupManagementScreen from './components/group/GroupManagementScreen';
+import ProfileScreen from './components/profile/ProfileScreen';
 
 function App() {
     const [currentScreen, setCurrentScreen] = useState<'splash' | 'login' | 'main'>('splash');
     const [activeTab, setActiveTab] = useState<'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications'>('overview');
-    const [settingsView, setSettingsView] = useState<'main' | 'ai-debug'>('main');
+    const [settingsView, setSettingsView] = useState<'main' | 'ai-debug' | 'profile'>('main');
     const [simulationState, setSimulationState] = useState<'setup' | 'running'>('setup');
     const [isDemoActive, setIsDemoActive] = useState(false);
     const [activeEventCameraId, setActiveEventCameraId] = useState<string | null>(null);
@@ -152,6 +153,11 @@ function App() {
         setNotifications(prev => prev.map(n => ({ ...n, isNew: false })));
     };
 
+    const handleOpenProfile = () => {
+        setSettingsView('profile');
+        setActiveTab('settings');
+    };
+
     // ... (existing code)
 
     const renderContent = () => {
@@ -176,6 +182,7 @@ function App() {
                                     camera={cameras.find(c => c.id === activeEventCameraId) || cameras[0]}
                                     onBack={handleBackFromEvents}
                                     onOpenNotifications={handleOpenNotifications}
+                                    onOpenProfile={handleOpenProfile}
                                     hasUnread={hasUnread}
                                 />
                             ) : isDemoActive ? (
@@ -223,6 +230,7 @@ function App() {
                                     onViewEvents={handleViewEvents}
                                     onDeleteCamera={handleDeleteCamera}
                                     onOpenNotifications={handleOpenNotifications}
+                                    onOpenProfile={handleOpenProfile}
                                     hasUnread={hasUnread}
                                 />
                             )}
@@ -235,7 +243,7 @@ function App() {
                             // Logic to get events for statistics (e.g. from demo camera)
                             const demoCam = cameras.find(c => c.source === 'demo');
                             const events = demoCam?.events || [];
-                            return <StatisticsScreen events={events} />;
+                            return <StatisticsScreen events={events} onOpenProfile={handleOpenProfile} />;
                         })()
                     )}
 
@@ -262,7 +270,7 @@ function App() {
                             // Or maybe remove that button now that we have a tab?
                             // Let's keep logic compatible.
                             return showStatistics ? (
-                                <StatisticsScreen events={events} />
+                                <StatisticsScreen events={events} onOpenProfile={handleOpenProfile} />
                             ) : (
                                 <StatusScreen
                                     status={status}
@@ -271,6 +279,7 @@ function App() {
                                     onShowStatistics={() => setShowStatistics(true)}
                                     // Pass notification props
                                     onOpenNotifications={handleOpenNotifications}
+                                    onOpenProfile={handleOpenProfile}
                                     hasUnread={hasUnread}
                                 />
                             );
@@ -285,11 +294,14 @@ function App() {
                                 onToggleTheme={() => setIsDarkMode(!isDarkMode)}
                                 onNavigate={(screen) => {
                                     if (screen === 'ai-debug') setSettingsView('ai-debug');
+                                    else if (screen === 'profile') setSettingsView('profile');
                                     else if (screen === 'overview') setActiveTab('overview');
                                     else if (screen === 'status') setActiveTab('status');
                                     else if (screen === 'statistics') setActiveTab('statistics');
                                     // 'notification', 'users' -> no action yet
                                 }} />
+                        ) : settingsView === 'profile' ? (
+                            <ProfileScreen onBack={() => setSettingsView('main')} />
                         ) : (
                             <AIDebugScreen onBack={() => setSettingsView('main')} />
                         )

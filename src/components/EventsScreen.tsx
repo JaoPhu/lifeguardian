@@ -7,10 +7,11 @@ interface EventsScreenProps {
     camera: Camera;
     onBack: () => void;
     onOpenNotifications?: () => void;
+    onOpenProfile?: () => void;
     hasUnread?: boolean;
 }
 
-const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotifications, hasUnread }) => {
+const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotifications, onOpenProfile, hasUnread }) => {
     // Mock thumbnails mostly static for now as per design image
     const thumbnails = [
         { label: 'Sitting sleep', posture: 'sitting' },
@@ -37,7 +38,10 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotif
                                 <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0D9488]"></div>
                             )}
                         </div>
-                        <div className="w-9 h-9 bg-yellow-100 rounded-full border-2 border-white overflow-hidden">
+                        <div
+                            className="w-9 h-9 bg-yellow-100 rounded-full border-2 border-white overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={onOpenProfile}
+                        >
                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" className="w-full h-full" />
                         </div>
                     </div>
