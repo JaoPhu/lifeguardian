@@ -41,7 +41,10 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfi
         const d = date.getDate().toString().padStart(2, '0');
         const m = (date.getMonth() + 1).toString().padStart(2, '0');
         const y = (date.getFullYear() + 543).toString().slice(-2); // BE Year 2 digits
-        return `Today ${d}/${m}/${y}`;
+        const isToday = date.getDate() === new Date().getDate() &&
+            date.getMonth() === new Date().getMonth() &&
+            date.getFullYear() === new Date().getFullYear();
+        return `${isToday ? 'Today' : ''} ${d}/${m}/${y}`.trim();
     };
 
     const handleDateClick = (day: number) => {
@@ -67,10 +70,12 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfi
 
     // Filter events for selected date
     const dailyEvents = (events || []).filter(e => {
-        const today = new Date();
-        return selectedDate.getDate() === today.getDate() &&
-            selectedDate.getMonth() === today.getMonth() &&
-            selectedDate.getFullYear() === today.getFullYear();
+        // Fallback for old data: assume 2026-01-13 if no e.date
+        const dateStr = e.date || '2026-01-13';
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return selectedDate.getFullYear() === y &&
+            selectedDate.getMonth() === (m - 1) &&
+            selectedDate.getDate() === d;
     });
 
     const hasData = dailyEvents.length > 0;
@@ -165,17 +170,23 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfi
         { name: 'Sun', relax: 0, work: 0, walk: 0, falls: 0, placeholder: 10 },
     ];
 
-    // Populate weekly data if today has data
-    if (hasData) {
-        const dayIndex = new Date().getDay(); // 0-6
-        const mapIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+    // Populate weekly data from all events
+    (events || []).forEach(e => {
+        if (!e.date) return;
+        const [y, m, d] = e.date.split('-').map(Number);
+        const eventDate = new Date(y, m - 1, d);
+
+        // Check if event is in the current viewed week (simplified: match the month/year of currentMonth)
+        // More robust: calculate which day of week it is
+        const dayIndex = eventDate.getDay(); // 0-6 (Sun-Sat)
+        const mapIndex = dayIndex === 0 ? 6 : dayIndex - 1; // 0-6 (Mon-Sun)
+
         if (weeklyData[mapIndex]) {
-            weeklyData[mapIndex].relax = sitCount + layCount;
-            weeklyData[mapIndex].falls = fallCount;
-            // Clear placeholder for today since we have data
+            if (e.type === 'sitting' || e.type === 'laying') weeklyData[mapIndex].relax += 0.5; // match card calc
+            if (e.type === 'falling') weeklyData[mapIndex].falls += 1;
             weeklyData[mapIndex].placeholder = 0;
         }
-    }
+    });
 
     return (
         <div className="flex flex-col h-full bg-[#0D9488] relative">

@@ -99,13 +99,19 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, isDarkMode,
                     ))}
 
                     {/* Reset Password */}
-                    <div className={clsx("flex items-center gap-4 p-4 cursor-pointer border-t transition-colors", isDarkMode ? "hover:bg-gray-700 border-gray-700" : "hover:bg-gray-50 border-gray-100")}>
+                    <div
+                        onClick={() => onNavigate('reset-password')}
+                        className={clsx("flex items-center gap-4 p-4 cursor-pointer border-t transition-colors", isDarkMode ? "hover:bg-gray-700 border-gray-700" : "hover:bg-gray-50 border-gray-100")}
+                    >
                         <Lock className="w-6 h-6 text-red-500 mr-2" />
                         <span className="flex-1 text-red-500 font-medium text-base">Reset Password</span>
                     </div>
 
                     {/* Logout */}
-                    <div className={clsx("flex items-center gap-4 p-4 cursor-pointer border-t transition-colors", isDarkMode ? "hover:bg-gray-700 border-gray-700" : "hover:bg-gray-50 border-gray-100")}>
+                    <div
+                        onClick={() => onNavigate('logout')}
+                        className={clsx("flex items-center gap-4 p-4 cursor-pointer border-t transition-colors", isDarkMode ? "hover:bg-gray-700 border-gray-700" : "hover:bg-gray-50 border-gray-100")}
+                    >
                         <LogOut className="w-6 h-6 text-red-500 mr-2" />
                         <span className="flex-1 text-red-500 font-medium text-base">Logout</span>
                     </div>

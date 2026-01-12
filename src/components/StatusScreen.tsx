@@ -23,14 +23,6 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
     const getMockActivity = () => {
         let uiConfig;
 
-        // Shared Camera Card Logic
-        const sharedCameraCards = user.joinedGroups?.map((group) => ({
-            id: group.id,
-            title: `${group.owner}'s Camera`, // e.g., "Phu's Camera"
-            status: 'disconnected',
-            description: 'No connection\nThis function is not available.',
-        })) || []; // Default empty if undefined
-
         // 1. Determine base colors and default daily activities
         switch (status) {
             case 'normal':
@@ -126,7 +118,7 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
     const { bg, iconBg, icon: StatusIcon, statusTitle, statusDesc, textColor, iconColor, activities } = getMockActivity();
 
     return (
-        <div className="flex flex-col h-full bg-[#0D9488] relative">
+        <div className="flex flex-col h-full bg-[#0D9488] dark:bg-gray-900 transition-colors duration-300 relative">
             {/* Header */}
             <div className="pt-14 pb-8 px-6 flex justify-between items-center bg-[#0D9488] z-20">
                 <h1 className="text-3xl font-bold tracking-wide text-white">LifeGuardain</h1>
@@ -147,10 +139,10 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 bg-white px-6 pt-8 pb-4 flex flex-col gap-6 overflow-y-auto z-10">
+            <div className="flex-1 bg-white dark:bg-gray-900 px-6 pt-8 pb-4 flex flex-col gap-6 overflow-y-auto z-10 transition-colors duration-300">
 
                 {/* Status Card */}
-                <div className={clsx("w-full rounded-[2rem] p-6 shadow-sm transition-colors duration-300 relative overflow-hidden", bg)}>
+                <div className={clsx("w-full rounded-[2rem] p-6 shadow-md transition-colors duration-300 relative overflow-hidden", bg, status === 'none' && 'dark:bg-gray-800 dark:border dark:border-gray-700')}>
                     <div className="flex items-center gap-4 relative z-10 h-32">
                         {/* Status Icon Circle */}
                         {StatusIcon && (
@@ -168,8 +160,8 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                 </div>
 
                 {/* Activity Summary Card */}
-                <div className="bg-white rounded-[2rem] p-6 shadow-lg border border-gray-100 flex-1">
-                    <h3 className="text-[#0D9488] font-bold text-sm mb-4">Activity Summary</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-[2rem] p-6 shadow-lg border border-gray-100 dark:border-gray-700 flex-1 transition-colors duration-300">
+                    <h3 className="text-[#0D9488] dark:text-teal-400 font-bold text-sm mb-4">Activity Summary</h3>
 
                     <div className="space-y-3">
                         {activities.length === 0 ? (
@@ -201,7 +193,7 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
 
             </div>
             {/* Bottom spacer for nav */}
-            <div className="h-2 bg-white"></div>
+            <div className="h-2 bg-white dark:bg-gray-900 transition-colors duration-300"></div>
         </div>
     );
 };
@@ -210,10 +202,12 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
 const SummaryItem: React.FC<{ icon: React.ElementType, text: string, highlight?: boolean }> = ({ icon: Icon, text, highlight }) => (
     <div className={clsx(
         "flex items-center gap-3 p-3 rounded-xl transition-colors",
-        highlight ? "bg-gray-200/80" : "bg-gray-100" // Highlight (Warning/Bad) gets darker gray background as per design mock
+        highlight
+            ? "bg-gray-200/80 dark:bg-gray-700/80"
+            : "bg-gray-100 dark:bg-gray-700/40"
     )}>
-        <Icon className={clsx("w-5 h-5", highlight ? "text-[#0D9488]" : "text-[#0D9488]")} />
-        <span className={clsx("text-xs font-bold", "text-gray-600")}>
+        <Icon className={clsx("w-5 h-5", "text-[#0D9488] dark:text-teal-400")} />
+        <span className={clsx("text-xs font-bold", "text-gray-600 dark:text-gray-300")}>
             {text}
         </span>
     </div>

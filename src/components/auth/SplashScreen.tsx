@@ -6,9 +6,31 @@ interface SplashScreenProps {
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
+    const [progress, setProgress] = React.useState(0);
+
     useEffect(() => {
-        const timer = setTimeout(onFinish, 2000);
-        return () => clearTimeout(timer);
+        const duration = 2000;
+        const interval = 20; // 20ms steps
+        const totalSteps = duration / interval;
+        const increment = 100 / totalSteps;
+
+        const timer = setInterval(() => {
+            setProgress(prev => {
+                const next = prev + increment;
+                if (next >= 100) {
+                    clearInterval(timer);
+                    return 100;
+                }
+                return next;
+            });
+        }, interval);
+
+        const finishTimer = setTimeout(onFinish, duration);
+
+        return () => {
+            clearInterval(timer);
+            clearTimeout(finishTimer);
+        };
     }, [onFinish]);
 
     return (
@@ -25,7 +47,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
             <div className="absolute bottom-10 z-10 w-full px-12">
                 <div className="h-1 bg-primary-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-300 w-1/3 animate-[loading_2s_ease-in-out_infinite]"></div>
+                    <div
+                        className="h-full bg-primary-300 transition-all duration-75 ease-out"
+                        style={{ width: `${progress}%` }}
+                    ></div>
                 </div>
             </div>
         </div>

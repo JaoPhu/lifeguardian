@@ -21,6 +21,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
     // Default clip length = 5 minutes if not uploaded (as per request), or matches uploaded video
     const [videoTimeSec, setVideoTimeSec] = useState(0);
     const [videoDuration, setVideoDuration] = useState(config.videoUrl ? 0 : 5 * 60); // Dynamic if video
+    const [isPlaying, setIsPlaying] = useState(true);
 
     // Video Element Ref
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,24 +30,30 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
     const postureHistory = useRef<string[]>([]);
 
     // Initialize Simulation Start Time - ANCHOR: Dependent only on ID to prevent feedback loop when we update config
+    // Initialize Simulation Start Time - ANCHOR: Dependent only on ID
     const startDateTime = React.useMemo(() => {
         const [hours, minutes] = config.startTime.split(':').map(Number);
-        const d = new Date(config.date);
-        d.setHours(hours, minutes, 0, 0);
+        // Explicitly parse YYYY-MM-DD to avoid timezone ambiguity with new Date(string)
+        const [year, month, day] = config.date.split('-').map(Number);
+        const d = new Date(year, month - 1, day, hours, minutes, 0, 0);
         return d;
-    }, [config.id]); // CRITICAL: Only re-calc if ID changes (new simulation), ignore updating date/time props
+    }, [config.id]);
 
-    // DERIVED Current Time (No longer state, avoids desync)
-    // Formula: Start + (RealSeconds * Speed * 60 * 1000ms)
-    // 1 Real Sec = 1 Sim Minute * Speed
+    // DERIVED Current Time
+    // 1 Real Sec = 1 Sim Minute * Speed (default logic)
     const currentTime = new Date(startDateTime.getTime() + (videoTimeSec * config.speed * 60 * 1000));
 
     // FEEDBACK LOOP: Update App state with current simulated time so Status Screen sees it
     useEffect(() => {
-        if (onConfigUpdate) {
+        if (onConfigUpdate && isPlaying) {
             // 1. Time & Date
             const timeStr = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-            const dateStr = currentTime.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            // Construct YYYY-MM-DD from local components to avoid UTC shift
+            const year = currentTime.getFullYear();
+            const month = (currentTime.getMonth() + 1).toString().padStart(2, '0');
+            const day = currentTime.getDate().toString().padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
 
             // 2. Duration Text (Formatted) based on SIMULATED TIME
             // 1 Real Sec = 'config.speed' Minutes
@@ -67,10 +74,9 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                 });
             }
         }
-    }, [Math.floor(videoTimeSec), config.speed]); // Check every Real Second
+    }, [Math.floor(videoTimeSec), config.speed, isPlaying]); // Check every Real Second
 
     const [stickmanPosture, setStickmanPosture] = useState<'standing' | 'sitting' | 'laying' | 'falling'>('standing');
-    const [hasTriggeredEvent, setHasTriggeredEvent] = useState(false);
 
     // Sitting Time Logic
     const [sittingTime, setSittingTime] = useState(0);
@@ -106,18 +112,23 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         }
     }, [showNotification]);
 
-    // 1. Playback Rate Effect for Video - Force Normal Speed (User request: "nothing accelerating it")
+    // 1. Playback Rate and Pause/Play Effect
     useEffect(() => {
         if (videoRef.current) {
             videoRef.current.playbackRate = 1.0;
+            if (isPlaying) {
+                videoRef.current.play().catch(e => console.error("Video play failed:", e));
+            } else {
+                videoRef.current.pause();
+            }
         }
-    }, [config.speed]);
+    }, [config.speed, isPlaying]);
 
     // 2. Timer Loop (Only checks events and increments time IF NO VIDEO)
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
 
-        if (!config.videoUrl) {
+        if (!config.videoUrl && isPlaying) {
             interval = setInterval(() => {
                 setVideoTimeSec(prev => {
                     if (prev >= videoDuration) {
@@ -133,11 +144,11 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [config.videoUrl, videoDuration, onStop]);
+    }, [config.videoUrl, videoDuration, onStop, isPlaying]);
 
     // 3. Sitting Time Calculation (Triggered by videoTimeSec changes)
     useEffect(() => {
-        if (videoTimeSec > 0) {
+        if (videoTimeSec > 0 && isPlaying) {
             const simulationSecondsPassed = 60 * config.speed; // 1 Real Sec = X Sim Minutes (Speed)
             // Note: In video mode causing rapid updates, this might be too fast?
             // onTimeUpdate fires ~4Hz. We should check delta?
@@ -198,7 +209,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         initAI();
 
         const animate = () => {
-            if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended) {
+            if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended && isPlaying) {
                 // 1. Detect
                 const startTimeMs = performance.now();
                 const landmarks = poseDetectionService.detectForVideo(videoRef.current, startTimeMs);
@@ -236,7 +247,14 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
 
                     // Helper to capture and trigger event
                     const triggerEvent = (type: 'standing' | 'sitting' | 'laying' | 'falling', critical: boolean = false) => {
-                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        // USE SIMULATED TIME
+                        const simTime = new Date(startDateTime.getTime() + (videoRef.current ? videoRef.current.currentTime : videoTimeSec) * config.speed * 60 * 1000);
+                        const timeStr = simTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                        const y = simTime.getFullYear();
+                        const m = (simTime.getMonth() + 1).toString().padStart(2, '0');
+                        const d = simTime.getDate().toString().padStart(2, '0');
+                        const dateStr = `${y}-${m}-${d}`;
 
                         let snapshotUrl = '';
                         if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
@@ -258,6 +276,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                             id: crypto.randomUUID(),
                             type: type,
                             timestamp: timeStr,
+                            date: dateStr,
                             snapshotUrl: snapshotUrl,
                             isCritical: critical
                         };
@@ -295,14 +314,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [hasTriggeredEvent, onEventAdded]); // Re-bind if triggered state changes
-
-    // Auto-Event Trigger code - DISABLED when using real AI (or keep as fallback?)
-    // Let's Keep it disabled if we are relying on AI, OR allow it as fallback?
-    // User requested "Use ML Kit", so presumably we disable the fake timer logic or make it optional.
-    // For now, I will COMMENT OUT the fake trigger logic so we rely on Real AI.
-    /* 
-    useEffect(() => { ... existing fake timer logic ... */
+    }, [onEventAdded, isPlaying]); // Re-bind if triggered state changes
 
     // Format Video Time helper
     const formatVideoTime = (totalSeconds: number) => {
@@ -318,6 +330,8 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
 
     const currentVideoTimeStr = formatVideoTime(videoTimeSec);
     const totalVideoDurationStr = formatVideoTime(videoDuration);
+
+    const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
 
     return (
         <div className="flex flex-col h-full bg-[#0D9488] relative">
@@ -365,25 +379,33 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                 {/* Camera View Card */}
                 <div className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 relative">
                     {/* Visualizer Title */}
-                    <div className="px-5 py-3 border-b border-gray-100 flex justify-between items-center bg-white">
-                        <span className="text-[#0D9488] font-bold text-sm">Camera view : {config.cameraName || 'Desk'}</span>
+                    <div className="h-14 px-5 border-b border-gray-100 flex justify-between items-center bg-white">
+                        <span className="text-[#0D9488] font-bold text-sm">{config.cameraName || 'Desk'}</span>
+                        {!isPlaying && (
+                            <div className="flex items-center gap-1.5 bg-amber-50 px-3 py-1 rounded-full border border-amber-100 animate-in fade-in zoom-in duration-300">
+                                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
+                                <span className="text-amber-600 text-[10px] font-black uppercase tracking-wider">Paused</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Content Area */}
-                    <div className="bg-primary-950 aspect-video relative flex items-center justify-center bg-black">
+                    <div className={clsx("bg-black relative flex items-center justify-center overflow-hidden transition-all duration-500", !videoAspectRatio ? "aspect-[4/3]" : "max-h-[450px]")}
+                        style={videoAspectRatio ? { aspectRatio: videoAspectRatio } : {}}
+                    >
                         {config.videoUrl ? (
                             <>
                                 <video
                                     ref={videoRef}
                                     src={config.videoUrl}
-                                    className="absolute inset-0 w-full h-full object-contain"
+                                    className="w-full h-full object-contain"
                                     autoPlay
                                     playsInline
                                     crossOrigin="anonymous" // Allow canvas capture if source permits
-                                    // muted // Let user hear audio? Maybe muted is safer for autoplay
                                     onTimeUpdate={handleVideoTimeUpdate}
                                     onLoadedMetadata={(e) => {
                                         handleVideoLoadedMetadata(e);
+                                        setVideoAspectRatio(e.currentTarget.videoWidth / e.currentTarget.videoHeight);
                                         // Resize canvas to match video
                                         if (canvasRef.current) {
                                             canvasRef.current.width = e.currentTarget.videoWidth;
@@ -413,24 +435,30 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                                 />
                             </>
                         )}
+                        {/* Paused Overlay Removed - Moved to Header */}
                     </div>
 
                     {/* Footer of Card */}
-                    <div className="px-5 py-2 flex justify-between items-center bg-white border-t border-gray-100">
-                        <span className="text-red-500 font-bold text-xs animate-pulse">LIVE</span>
-                        <span className="text-gray-600 font-semibold text-xs font-mono">{currentVideoTimeStr}/{totalVideoDurationStr}</span>
+                    <div className="px-5 py-2 flex justify-between items-center bg-white border-t border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <span className="text-red-500 font-bold text-xs animate-pulse flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                            LIVE
+                        </span>
+                        <span className="text-gray-400 dark:text-gray-500 font-bold text-[10px] font-mono tracking-tighter bg-gray-50 dark:bg-gray-900/50 px-2 py-0.5 rounded-md border border-gray-100 dark:border-gray-700">
+                            {currentVideoTimeStr} / {totalVideoDurationStr}
+                        </span>
                     </div>
                 </div>
 
                 {/* Controls Area (Bottom Card) */}
-                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-between">
-                    <div className="w-full flex justify-center mb-2">
-                        <span className="text-gray-500 font-bold text-sm">Time simulation</span>
+                <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-between">
+                    <div className="w-full flex justify-center mb-1">
+                        <span className="text-gray-500 font-bold text-xs">Time simulation</span>
                     </div>
 
-                    <div className="flex flex-col items-center mb-4">
-                        <div className="text-5xl font-bold text-gray-800 tracking-tight">{formattedTime}</div>
-                        <div className="text-sm font-bold text-gray-400 mt-1">{formattedDate}</div>
+                    <div className="flex flex-col items-center mb-2">
+                        <div className="text-4xl font-bold text-gray-800 tracking-tight">{formattedTime}</div>
+                        <div className="text-[10px] font-bold text-gray-400 mt-0.5">{formattedDate}</div>
                     </div>
 
                     {/* Slider */}
@@ -451,20 +479,27 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                         <span>{totalVideoDurationStr}</span>
                     </div>
 
-                    <div className="w-full flex justify-end mb-4">
+                    <div className="w-full flex justify-end mb-2">
                         <span className="text-xs font-bold text-gray-800">Speed : {config.speed}X</span>
                     </div>
 
-                    <div className="text-[10px] text-gray-500 font-bold mb-4">
+                    <div className="text-[10px] text-gray-500 font-bold mb-2">
                         One second equals {config.speed} minutes.
                     </div>
 
-                    <button
-                        onClick={onStop}
-                        className="w-full bg-[#0D9488] hover:bg-teal-700 text-white text-xl font-bold py-3 rounded-xl shadow-lg shadow-teal-600/30 transition-transform active:scale-95"
-                    >
-                        Stop
-                    </button>
+                    <div className="w-full flex flex-col mt-2">
+                        <button
+                            onClick={() => setIsPlaying(!isPlaying)}
+                            className={clsx(
+                                "w-full text-xl font-bold py-3.5 rounded-2xl shadow-lg transition-all active:scale-95",
+                                isPlaying
+                                    ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-600/30"
+                                    : "bg-[#0D9488] hover:bg-teal-700 text-white shadow-teal-600/30"
+                            )}
+                        >
+                            {isPlaying ? 'Stop' : 'Play'}
+                        </button>
+                    </div>
                 </div>
             </div>
             {/* Bottom spacer for navigation if needed */}

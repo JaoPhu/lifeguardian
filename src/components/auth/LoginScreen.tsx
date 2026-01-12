@@ -21,7 +21,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack, onRegister, 
     return (
         <div className="flex flex-col h-full bg-white relative font-sans overflow-y-auto scrollbar-hide">
             {/* Header */}
-            <div className="pt-8 px-6 pb-2">
+            <div className="pt-16 px-6 pb-2">
                 <button
                     onClick={onBack}
                     className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors mb-4 group"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, Copy, Trash2, Smartphone, Users, PenLine, ChevronLeft, User, Camera } from 'lucide-react';
+import { Bell, Copy, Trash2, Smartphone, Users, PenLine, ChevronLeft } from 'lucide-react';
 import clsx from 'clsx';
 import { GroupMember, UserRole } from '../../types';
 
@@ -555,7 +555,7 @@ const GroupManagementScreen: React.FC<GroupManagementScreenProps> = ({ onOpenNot
 
                         {/* Rename Modal */}
                         {isRenaming && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4 text-center">
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 text-center">
                                 <div className="bg-white dark:bg-gray-800 w-[80%] max-w-[280px] rounded-[1.5rem] p-5 shadow-2xl animate-in zoom-in-95 duration-200">
                                     <h3 className="text-center text-gray-600 dark:text-gray-200 font-bold text-base mb-5">Change group name</h3>
 

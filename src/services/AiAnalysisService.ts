@@ -58,7 +58,7 @@ export const AiAnalysisService = {
 
         return {
             summary,
-            events
+            events: []
         };
     }
 };

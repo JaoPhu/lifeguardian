@@ -58,16 +58,8 @@ function App() {
     // AI Analysis State
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Camera List State (Initialized with dummy Camera 1)
-    const [cameras, setCameras] = useState<Camera[]>([
-        {
-            id: 'cam-01',
-            name: 'Camera 1',
-            source: 'camera',
-            status: 'offline', // Image shows "No connection"
-            events: []
-        }
-    ]);
+    // Camera List State (Initialized empty, removed dummy Camera 1)
+    const [cameras, setCameras] = useState<Camera[]>([]);
 
     // Handlers
     const handleSplashFinish = () => setCurrentScreen('welcome');
@@ -114,9 +106,16 @@ function App() {
         const finalConfig = configRef.current;
         if (finalConfig) {
             setCameras(prev => {
+                let newName = finalConfig.cameraName;
+                let counter = 1;
+                while (prev.some(c => c.name === newName)) {
+                    newName = `${finalConfig.cameraName} ${counter}`;
+                    counter++;
+                }
+
                 const newCamera: Camera = {
                     id: crypto.randomUUID(),
-                    name: finalConfig.cameraName,
+                    name: newName,
                     source: 'demo',
                     status: 'online',
                     events: [...eventsRef.current], // Read from ref
@@ -471,10 +470,15 @@ function App() {
                                             else if (screen === 'profile') {
                                                 setProfileMode('view');
                                             }
+                                            else if (screen === 'reset-password') {
+                                                setCurrentScreen('reset-password');
+                                            }
+                                            else if (screen === 'logout') {
+                                                setCurrentScreen('welcome');
+                                            }
                                             else if (screen === 'overview') setActiveTab('overview');
                                             else if (screen === 'status') setActiveTab('status');
                                             else if (screen === 'statistics') setActiveTab('statistics');
-                                            // 'notification', 'users' -> no action yet
                                         }} />
                                 ) : (
                                     <AIDebugScreen onBack={() => setSettingsView('main')} />

@@ -63,20 +63,20 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotif
                     <div className="grid grid-cols-4 gap-2">
                         {/* Show actual events if available, otherwise fallback or empty */}
                         {camera.events.length > 0 ? (
-                            camera.events.slice(0, 4).map((event, idx) => (
+                            camera.events.slice(0, 4).map((event) => (
                                 <div key={event.id} className="flex flex-col items-center gap-1">
-                                    <div className={clsx("w-full aspect-square bg-black rounded-lg flex items-center justify-center border overflow-hidden relative", event.type === 'falling' ? "border-red-500 border-4" : "border-gray-100")}>
+                                    <div className="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-center border border-gray-100 dark:border-gray-700 overflow-hidden relative">
                                         {event.snapshotUrl ? (
                                             <img src={event.snapshotUrl} alt={event.type} className="w-full h-full object-cover" />
                                         ) : (
-                                            <StickmanViewer posture={event.type} className={clsx("w-10 h-10", event.type === 'falling' ? "text-red-500" : "text-yellow-400")} />
+                                            <StickmanViewer posture={event.type} className={clsx("w-10 h-10", event.type === 'falling' ? "text-amber-500" : "text-yellow-400")} />
                                         )}
                                         <div className="absolute top-1 right-1 text-[8px] text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md font-mono border border-white/10">
                                             {event.timestamp}
                                         </div>
                                     </div>
 
-                                    <span className={clsx("text-[10px] font-medium text-center leading-tight capitalize", event.type === 'falling' ? "text-red-500 font-bold" : "text-gray-500 dark:text-gray-400")}>
+                                    <span className="text-[10px] font-medium text-center leading-tight capitalize text-gray-500 dark:text-gray-400">
                                         {event.type}
                                     </span>
                                 </div>
@@ -110,34 +110,65 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotif
                         {camera.events.length === 0 ? (
                             <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">No recent events found.</p>
                         ) : (
-                            camera.events.map((event, idx) => (
-                                <div key={event.id || idx} className={clsx("flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 px-2 rounded-lg transition-colors", event.type === 'falling' && "bg-red-50 border-l-4 border-l-red-500 pl-2")}>
-                                    <span className={clsx("font-bold text-sm capitalize", event.type === 'falling' ? "text-red-500" : "text-gray-600 dark:text-gray-300")}>{event.type}</span>
-                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">{event.timestamp}</span>
-                                </div>
-                            ))
+                            (() => {
+                                // Calculate dates for ALL events
+                                const startDateStr = camera.config?.date || 'xxxx-xx-xx';
+                                const startTimeStr = camera.config?.startTime || '00:00';
+
+                                const sortedEvents = [...camera.events].reverse(); // Oldest to Newest
+
+                                // Parse safely to local time
+                                const [sYear, sMonth, sDay] = startDateStr.split('-').map(Number);
+                                let currentDate = new Date(sYear, sMonth - 1, sDay);
+
+                                let previousTime = startTimeStr;
+                                const eventDates = new Map<string, string>(); // ID -> DateString
+
+                                sortedEvents.forEach(e => {
+                                    // Check for midnight crossing
+                                    if (e.timestamp < previousTime && Math.abs(parseInt(e.timestamp.split(':')[0]) - parseInt(previousTime.split(':')[0])) > 12) {
+                                        currentDate.setDate(currentDate.getDate() + 1);
+                                    }
+                                    previousTime = e.timestamp;
+
+                                    // Format manually to avoid UTC shifts
+                                    const y = currentDate.getFullYear();
+                                    const m = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+                                    const d = currentDate.getDate().toString().padStart(2, '0');
+                                    eventDates.set(e.id, `${y}-${m}-${d}`);
+                                });
+
+                                // Perform check: do we have > 1 unique date OR does simulation span multiple days?
+                                const uniqueDates = new Set(eventDates.values());
+                                const originalDate = camera.config?.originalDate || startDateStr;
+                                const currentDateStr = camera.config?.date || startDateStr;
+
+                                const showDate = uniqueDates.size > 1 || originalDate !== currentDateStr;
+
+                                return camera.events.map((event) => {
+                                    const dateStr = eventDates.get(event.id);
+                                    // Format DD/MM/YYYY or similar? User image shows 2026/01/13.
+                                    // Let's use YYYY/MM/DD to match common dashboard style if possible, 
+                                    // but usually DD/MM is better for small row.
+                                    // Actually, let's use the format from the dashboard for consistency: YYYY/MM/DD
+                                    const formattedDate = dateStr ? dateStr.replace(/-/g, '/') : '';
+
+                                    return (
+                                        <div key={event.id} className="flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 px-2 rounded-lg transition-colors">
+                                            <span className="font-bold text-sm capitalize text-gray-600 dark:text-gray-300">{event.type}</span>
+                                            <div className="flex items-center gap-2">
+                                                {showDate && <span className="text-gray-400 dark:text-gray-500 text-[10px]">{formattedDate}</span>}
+                                                <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">{event.timestamp}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                            })()
                         )}
-                        {/* Fallback mock events if empty for demo visual */}
-                        {camera.events.length === 0 && (
-                            <>
-                                <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0">
-                                    <span className="text-gray-600 dark:text-gray-300 font-bold text-sm">Sitting sleep</span>
-                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">15:05</span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0">
-                                    <span className="text-gray-600 dark:text-gray-300 font-bold text-sm">Sitting clip</span>
-                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">14:45</span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0">
-                                    <span className="text-gray-600 dark:text-gray-300 font-bold text-sm">Stand up</span>
-                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">13:13</span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0">
-                                    <span className="text-gray-600 dark:text-gray-300 font-bold text-sm">Working</span>
-                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">09:10</span>
-                                </div>
-                            </>
-                        )}
+                        {/* Fallback mock events DELETED as requested by user to remove unused stick items? 
+                            User said "Image stick from old overlays remove... remove unused ones too". 
+                            The fallback list was hardcoded. Removing it now. 
+                         */}
                     </div>
                 </div>
             </div>

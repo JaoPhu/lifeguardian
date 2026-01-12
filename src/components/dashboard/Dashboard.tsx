@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Bell, Settings, Folder } from 'lucide-react';
 import { Camera } from '../../types';
-import StickmanViewer from '../simulation/StickmanViewer';
 
 interface DashboardProps {
     cameras: Camera[];
@@ -51,7 +50,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
             <div className="flex-1 px-4 pt-4 z-20 space-y-4 overflow-y-auto pb-20 scrollbar-hide">
 
                 {cameras.map((camera) => (
-                    <div key={camera.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 relative transition-colors duration-300">
+                    <div key={camera.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 pt-3 px-3 pb-2.5 relative transition-colors duration-300">
                         <div className="flex justify-between items-center px-2 mb-2">
                             <span className="text-[#0D9488] font-bold text-sm">{camera.name}</span>
 
@@ -84,11 +83,18 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
 
                         <div className={`aspect-video rounded-lg flex flex-col items-center justify-center gap-1 mb-2 relative overflow-hidden ${camera.status === 'online' ? 'bg-primary-950' : 'bg-[#D9D9D9] dark:bg-gray-600'}`}>
                             {camera.status === 'online' ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <StickmanViewer
-                                        posture={camera.events.length > 0 ? camera.events[0].type : (camera.config?.eventType ?? 'standing')}
-                                        className={`w-20 h-20 ${(camera.events.length > 0 ? camera.events[0].type : camera.config?.eventType) === 'falling' ? 'text-red-500' : 'text-yellow-400'}`}
-                                    />
+                                <div className="w-full h-full relative">
+                                    {camera.config?.thumbnailUrl ? (
+                                        <img
+                                            src={camera.config.thumbnailUrl}
+                                            alt="Preview"
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-black flex items-center justify-center">
+                                            {/* No thumbnail available */}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-center">
@@ -100,13 +106,32 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
 
                         {/* Footer Info Row */}
                         <div className="flex items-center px-1 mb-2">
-                            {/* Left: Date */}
-                            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold flex-1">
-                                {camera.status === 'online' ? (camera.config?.date || '19/09/2021').replace(/-/g, '/') : ''}
+                            {/* Left: Date Display Logic */}
+                            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold flex-1 leading-tight">
+                                {(() => {
+                                    if (camera.status !== 'online') return '';
+                                    if (!camera.config?.date) return '19/09/2021';
+
+                                    const originalDate = camera.config.originalDate || camera.config.date;
+                                    const currentDate = camera.config.date;
+
+                                    const fmtStart = originalDate.replace(/-/g, '/');
+                                    const fmtEnd = currentDate.replace(/-/g, '/');
+
+                                    if (fmtStart !== fmtEnd) {
+                                        return (
+                                            <>
+                                                <span className="block">Start : {fmtStart}</span>
+                                                <span className="block">End : {fmtEnd}</span>
+                                            </>
+                                        );
+                                    }
+                                    return fmtStart;
+                                })()}
                             </span>
 
                             {/* Center: Events Button */}
-                            <div className="flex justify-center flex-1">
+                            <div className="flex justify-center items-center flex-1 h-9">
                                 <button
                                     onClick={() => onViewEvents(camera.id)}
                                     disabled={camera.status === 'offline'}
@@ -128,7 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
 
                 {/* Shared Camera Cards (From Joined Groups) */}
                 {user.joinedGroups?.map((group) => (
-                    <div key={group.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 relative transition-colors duration-300">
+                    <div key={group.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 pt-3 px-3 pb-2.5 relative transition-colors duration-300">
                         <div className="flex justify-between items-center px-2 mb-2">
                             <span className="text-[#0D9488] font-bold text-sm">
                                 {group.owner === 'Phu' ? 'Camera : Living Room' : `${group.owner}'s Camera`}
@@ -148,7 +173,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
                             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold flex-1"></span>
 
                             {/* Center: Events Button */}
-                            <div className="flex justify-center flex-1">
+                            <div className="flex justify-center items-center flex-1 h-9">
                                 <button
                                     disabled={true}
                                     className="flex items-center gap-1 transition-colors text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50"
@@ -168,7 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
 
                 {/* Fallback Camera 1 if list is empty AND no joined groups */}
                 {cameras.length === 0 && (!user.joinedGroups || user.joinedGroups.length === 0) && (
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 transition-colors duration-300">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 pt-3 px-3 pb-2.5 transition-colors duration-300">
 
                         <div className="flex justify-between items-center px-2 mb-2">
                             <span className="text-[#0D9488] font-bold text-sm">Camera 1</span>
@@ -180,7 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
                         <div className="flex items-center px-1 mb-2">
                             <span className="text-[10px] text-gray-500 font-bold flex-1"></span>
 
-                            <div className="flex justify-center flex-1">
+                            <div className="flex justify-center items-center flex-1 h-9">
                                 <button
                                     disabled={true}
                                     className="flex items-center gap-1 text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50"

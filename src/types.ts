@@ -6,13 +6,16 @@ export interface VideoConfig {
   date: string;
   eventType?: 'sitting' | 'laying' | 'falling' | 'standing';
   videoUrl?: string;
+  thumbnailUrl?: string; // Captured first frame
   durationText?: string;
+  originalDate?: string; // To track start date for multi-day events
 }
 
 export interface SimulationEvent {
   id: string;
   type: 'sitting' | 'laying' | 'falling' | 'standing';
   timestamp: string; // HH:MM format
+  date?: string; // YYYY-MM-DD
   snapshotUrl: string; // Placeholder URL
   isCritical: boolean;
 }
