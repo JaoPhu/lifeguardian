@@ -34,7 +34,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, isDarkMode,
             <div className="pt-14 pb-8 px-6 bg-[#0D9488] shadow-md z-10 flex flex-col gap-4">
                 <div className="flex items-center justify-between text-white">
                     <div className="flex items-center gap-4">
-                        <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={() => onNavigate('back')} />
+                        <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={() => onNavigate('overview')} />
                         <h1 className="text-2xl font-bold">Settings</h1>
                     </div>
                     {/* Notification Icon - Matches Dashboard Style (White Filled) */}

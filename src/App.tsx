@@ -28,6 +28,9 @@ function App() {
     const [activeEventCameraId, setActiveEventCameraId] = useState<string | null>(null);
     const [showStatistics, setShowStatistics] = useState(false);
 
+    // Navigation History State
+    const [previousTab, setPreviousTab] = useState<'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications' | null>(null);
+
     // Data State
     const [currentConfig, setCurrentConfig] = useState<VideoConfig | null>(null);
     const [events, setEvents] = useState<SimulationEvent[]>([]);
@@ -154,11 +157,10 @@ function App() {
     };
 
     const handleOpenProfile = () => {
+        setPreviousTab(activeTab); // Store current tab before navigating
         setSettingsView('profile');
         setActiveTab('settings');
     };
-
-    // ... (existing code)
 
     const renderContent = () => {
         if (currentScreen === 'splash') {
@@ -294,14 +296,25 @@ function App() {
                                 onToggleTheme={() => setIsDarkMode(!isDarkMode)}
                                 onNavigate={(screen) => {
                                     if (screen === 'ai-debug') setSettingsView('ai-debug');
-                                    else if (screen === 'profile') setSettingsView('profile');
+                                    else if (screen === 'profile') {
+                                        setPreviousTab('settings'); // Explicitly set previous to settings main
+                                        setSettingsView('profile');
+                                    }
                                     else if (screen === 'overview') setActiveTab('overview');
                                     else if (screen === 'status') setActiveTab('status');
                                     else if (screen === 'statistics') setActiveTab('statistics');
                                     // 'notification', 'users' -> no action yet
                                 }} />
                         ) : settingsView === 'profile' ? (
-                            <ProfileScreen onBack={() => setSettingsView('main')} />
+                            <ProfileScreen onBack={() => {
+                                if (previousTab && previousTab !== 'settings') {
+                                    setActiveTab(previousTab);
+                                    setPreviousTab(null);
+                                } else {
+                                    setSettingsView('main');
+                                    setPreviousTab(null);
+                                }
+                            }} />
                         ) : (
                             <AIDebugScreen onBack={() => setSettingsView('main')} />
                         )
@@ -319,6 +332,7 @@ function App() {
                     {activeTab === 'users' && (
                         <GroupManagementScreen
                             onOpenNotifications={handleOpenNotifications}
+                            onOpenProfile={handleOpenProfile}
                             hasUnread={hasUnread}
                         />
                     )}
@@ -328,7 +342,7 @@ function App() {
                 <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
             </div>
         );
-    }
+    };
 
     return (
         <div className="min-h-screen bg-[#0F172A] flex items-center justify-center sm:p-4 font-sans">
