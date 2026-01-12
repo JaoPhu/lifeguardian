@@ -1,23 +1,22 @@
 # LifeGuardian
 
-LifeGuardian is a web-based prototype application for AI-powered office syndrome monitoring and event detection. It simulates video analysis to detect posture events like sitting too long, falling, or laying down.
+LifeGuardian is a web-based prototype application for AI-powered office syndrome monitoring and event detection. It uses computer vision to analyze postures and detect critical events such as falling, long-term sitting, or laying down to ensure workplace safety and health.
 
-## 🛠️ Tech Stack & Environment
+## 🛠️ Tech Stack & Languages
 
-This project is built using modern web technologies. Please ensure your development environment meets the following requirements:
+This project is built using a modern full-stack web approach, primarily focusing on clear AI integration within a mobile-native web experience.
+
+### Languages Used
+- **TypeScript (TSX/TS)**: Used for 100% of the application logic and UI components to ensure type safety and robust development.
+- **HTML5/CSS3**: Utilized via Tailwind CSS for high-performance, responsive styling and layout.
+- **JavaScript**: Underlying engine for AI processing and browser-based video analysis.
 
 ### Core Technologies
-- **Runtime**: [Node.js](https://nodejs.org/) (Version **v18.0.0** or higher is recommended)
-- **Package Manager**: [npm](https://www.npmjs.com/) (Version 9.0.0+)
-- **Framework**: [React](https://react.dev/) (v18.2)
-- **Build Tool**: [Vite](https://vitejs.dev/) (v5.1)
-- **Language**: [TypeScript](https://www.typescriptlang.org/) (v5.0+)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) (v3.4) + Vanilla CSS
-
-### Key Dependencies
-- `lucide-react`: For icons.
-- `recharts`: For statistical charts.
-- `@mediapipe/tasks-vision`: For AI Pose Detection.
+- **Runtime**: [Node.js](https://nodejs.org/) (Version **v18.0.0** or higher)
+- **Framework**: [React](https://react.dev/) (v18.2) + [Vite](https://vitejs.dev/)
+- **AI Engine**: [MediaPipe Pose Landmarker](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) (Client-side GPU/CPU)
+- **Package Manager**: [npm](https://www.npmjs.com/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 
 ---
 
@@ -32,82 +31,64 @@ cd lifeguardian
 ```
 
 ### 2. Install Dependencies
-Install the required packages using npm:
 ```bash
 npm install
 ```
 
 ### 3. Run Development Server
-Start the local development server:
 ```bash
 npm run dev
 ```
-After running this command, open your browser and navigate to `http://localhost:5173` (or the port shown in your terminal).
+Open `http://localhost:5173` in your browser.
 
 ---
 
 ## 🏗️ Building for Production
-
-To create a production-ready build:
-
 ```bash
 npm run build
-```
-This will generate a `dist` folder containing the compiled static assets. You can preview the production build locally using:
-```bash
 npm run preview
 ```
 
 ---
 
 ## 📂 Project Structure
-
 ```
 src/
-├── assets/         # Static assets (images, icons)
-├── components/     # React components
-│   ├── auth/       # Login/Authentication screens
-│   ├── dashboard/  # Main dashboard and camera cards
-│   ├── layout/     # Shared layout (BottomNav, etc.)
-│   ├── simulation/ # Stickman viewer and simulation logic
-│   ├── notification/ # Notification screen and logic
-│   ├── DemoSetup.tsx      # Video upload & config screen
-│   ├── SimulationRunning.tsx # Main simulation player (with AI)
+├── assets/         # Static assets
+├── components/     # React / TSX components (UI/UX)
+│   ├── auth/       # Login/Register
+│   ├── dashboard/  # Main view
+│   ├── stats/      # Analytics & Charts
+│   ├── simulation/ # Pose detection & 3D visualization
 │   └── ...
-├── services/       # AI & Logic Services (PoseDetectionService.ts)
-├── App.tsx         # Main application entry & routing logic
-├── main.tsx        # React DOM entry point
-└── types.ts        # TypeScript definitions
+├── services/       # AI Services (PoseDetectionService.ts)
+├── contexts/       # Global State (UserContext)
+├── App.tsx         # Main Routing & History
+└── types.ts        # TypeScript Definitions
 ```
 
-## 💡 Notes for Developers
-
-- **AI Pose Detection**: We use Google's MediaPipe for real-time pose detection in `src/services/PoseDetectionService.ts`. It runs client-side in the browser.
-- **Notification System**: Notifications represent the application state. They are managed globally in `App.tsx` and can be accessed from any screen via the Bell icon.
-- **Video Upload**: Video upload logic uses `URL.createObjectURL` for local preview. It does not upload files to a server in this prototype.
-- **Group Management**: Simple role-based invite system (Mocked) is located in `src/components/group`.
-
-### ✅ Completed Features
-- **Group Management**: Join via code (e.g., `LG-0001` for Admin/Phu, other `LG-` for Viewer).
-- **Profile Management**: View and edit group owner profiles (Admin only).
-- **Statistics UI**: Mockup charts and data visualization.
-- **Shared Cameras**: View cameras from joined groups on Dashboard.
-
-### 📝 Todo / Remaining Tasks
-- **Recent Events**: Implement detailed event logging and history view.
-- **Statistics**: Connect real data/logic to the charts (currently mock data).
+## 💡 Key Features Implemented
+- **AI Pose Detection**: Real-time processing of video frames using Google's MediaPipe.
+- **Infinite Looping Pickers**: Premium "wheel-style" selectors for Time and Speed configuration.
+- **Dynamic Dashboard**: Interactive camera cards with real-time status and thumbnails.
+- **Statistics & History**: Detailed analysis of user activity and critical events.
+- **Navigation History**: Persistent back-button history across all screens.
 
 ---
 
 ## 🇹🇭 สำหรับนักพัฒนา (Thai Summary)
 
-**สิ่งที่ต้องมี (Prerequisites):**
-*   **Node.js**: แนะนำเวอร์ชัน 18 ขึ้นไป
-*   **Editor**: VS Code (แนะนำติดตั้ง Extension: ES7+ React/Redux/React-Native snippets, Tailwind CSS IntelliSense)
+**LifeGuardian คืออะไร?**
+โปรเจกต์นี้เป็นตัวต้นแบบ (Prototype) ระบบตรวจจับท่าทางและอาการออฟฟิศซินโดรมด้วย AI ผ่านเว็บเบราว์เซอร์ โดยเน้นความง่ายในการใช้งานและประสิทธิภาพสูง
+
+**ภาษาและเทคโนโลยี:**
+*   **TypeScript (React/TSX)**: ใช้เป็นภาษาหลักในการเขียน UI และ Logic ทั้งหมด
+*   **MediaPipe**: ใช้สำหรับตรวจจับจุดบนร่างกาย (Pose Detection) แบบ Real-time
+*   **Tailwind CSS**: ใช้สำหรับงานดีไซน์ที่เน้นความพรีเมียมและรองรับหน้าจอมือถือ
 
 **วิธีเริ่มโปรเจกต์:**
-1.  ติดตั้ง dependencies: `npm install`
-2.  รันเซิร์ฟเวอร์ทดสอบ: `npm run dev`
-3.  เปิดเว็บเบราว์เซอร์ไปที่ลิงก์ที่แสดงใน Terminal (ปกติคือ `http://localhost:5173`)
+1.  `npm install`
+2.  `npm run dev`
+3.  เปิดลิงก์บน Browser
 
-> **ปล.** สำหรับคนที่จะพัฒนาต่อ ให้ทำ **Branch แยก** (`git checkout -b feature/your-feature-name`) ก่อนทำการ Commit/Push นะครับ
+> **สถานะปัจจุบัน**: กำลังอยู่ในขั้นตอนการปรับจูน AI (Smoothing) และเพิ่มรายละเอียดในบันทึกเหตุการณ์ (Recent Events Description)
