@@ -17,53 +17,103 @@ interface StatusScreenProps {
 
 const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStatistics, onOpenNotifications, onOpenProfile, hasUnread }) => {
 
-    // Helper to determine styles and content based on status
-    const getStatusConfig = () => {
+    // Mock Data Generator based on Status
+    const getMockActivity = () => {
+        let uiConfig;
+
+        // 1. Determine base colors and default daily activities
         switch (status) {
             case 'normal':
-                return {
+                uiConfig = {
+                    statusTitle: 'Status : Normal',
+                    statusDesc: 'No abnormal behavior detected.',
                     bg: 'bg-emerald-400',
                     iconBg: 'bg-emerald-500/30',
                     icon: Check,
-                    title: 'Status : Normal',
-                    description: 'No abnormal behavior detected.',
                     textColor: 'text-emerald-900',
-                    iconColor: 'text-emerald-900'
+                    iconColor: 'text-emerald-900',
+                    activities: [
+                        { icon: Activity, text: 'นั่งเป็นเวลา 1.30 ชั่วโมง', highlight: false },
+                        { icon: Clock, text: 'เดินล่าสุดเมื่อ 2 ชั่วโมงที่แล้ว', highlight: false },
+                        { icon: Eye, text: 'จ้องหน้าจอมาเป็นเวลา 0.30 ชั่วโมง', highlight: false },
+                        { icon: User, text: 'เวลานอนทั้งหมดเวลา 9 ชั่วโมง', highlight: false },
+                    ]
                 };
+                break;
             case 'warning':
-                return {
+                uiConfig = {
+                    statusTitle: 'Status : Warning',
+                    statusDesc: 'Detect risky behavior.',
                     bg: 'bg-amber-400',
                     iconBg: 'bg-amber-500/30',
                     icon: AlertTriangle,
-                    title: 'Status : Warning',
-                    description: 'Detect risky behavior.',
                     textColor: 'text-amber-900',
-                    iconColor: 'text-amber-900'
+                    iconColor: 'text-amber-900',
+                    activities: [
+                        { icon: Activity, text: 'นั่งเป็นเวลา 4.30 ชั่วโมง', highlight: true },
+                        { icon: User, text: 'ยังไม่ได้ทานอาหารมื้อเช้า', highlight: true },
+                        { icon: Eye, text: 'จ้องหน้าจอมาเป็นเวลา 3 ชั่วโมง', highlight: false },
+                        { icon: Clock, text: 'เวลานอนทั้งหมดเวลา 4 ชั่วโมง', highlight: false },
+                    ]
                 };
+                break;
             case 'emergency':
-                return {
+                uiConfig = {
+                    statusTitle: 'Status : Emergency',
+                    statusDesc: 'Emergency detected.',
                     bg: 'bg-red-500',
                     iconBg: 'bg-red-600/30',
-                    icon: Plus, // Medical cross representation
-                    title: 'Status : Emergency',
-                    description: 'Emergency detected.',
+                    icon: Plus,
                     textColor: 'text-white',
-                    iconColor: 'text-white'
+                    iconColor: 'text-white',
+                    activities: [
+                        { icon: User, text: 'ยังไม่ได้ทานอาหารมื้อเช้า', highlight: true },
+                        { icon: Activity, text: 'ตรวจพบการล้ม ผู้ได้รับบาดเจ็บไม่มีสติและไม่มีการขยับ', highlight: true },
+                    ]
                 };
+                break;
             default: // none
-                return {
+                uiConfig = {
+                    statusTitle: 'Status : None',
+                    statusDesc: 'No information.',
                     bg: 'bg-gray-100',
                     iconBg: 'bg-transparent',
                     icon: null,
-                    title: 'Status : None',
-                    description: 'No information.',
                     textColor: 'text-gray-500',
-                    iconColor: 'text-gray-400'
+                    iconColor: 'text-gray-400',
+                    activities: []
                 };
+                break;
         }
+
+        // 2. Override activities if we are viewing a specific video result
+        if (config) {
+            let activityIcon = Activity;
+            // Use config.durationText if available, otherwise fallback
+            let durationStr = config.durationText || '1.30 ชั่วโมง';
+            let activityText = 'ตรวจพบกิจกรรมปกติ';
+            let isHighlight = false;
+
+            if (config.eventType === 'sitting') {
+                activityText = `นั่งเป็นเวลา ${durationStr}`;
+                isHighlight = status === 'warning'; // Sitting can be warning
+            } else if (config.eventType === 'falling') {
+                activityText = 'ตรวจพบการล้ม ผู้ได้รับบาดเจ็บไม่มีสติ';
+                isHighlight = true;
+            } else if (config.eventType === 'laying') {
+                activityText = `นอนพักผ่อน ${durationStr}`;
+                activityIcon = User;
+            }
+
+            uiConfig.activities = [
+                { icon: activityIcon, text: activityText, highlight: isHighlight }
+            ];
+        }
+
+        return uiConfig;
     };
 
-    const { bg, iconBg, icon: StatusIcon, title, description, textColor, iconColor } = getStatusConfig();
+    const { bg, iconBg, icon: StatusIcon, statusTitle, statusDesc, textColor, iconColor, activities } = getMockActivity();
 
     return (
         <div className="flex flex-col h-full bg-[#0D9488] relative">
@@ -86,7 +136,7 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                 </div>
             </div>
 
-            {/* Content Area (Rounded Top removed) */}
+            {/* Content Area */}
             <div className="flex-1 bg-white px-6 pt-8 pb-4 flex flex-col gap-6 overflow-y-auto z-10">
 
                 {/* Status Card */}
@@ -101,47 +151,30 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
 
                         {/* Text */}
                         <div className={clsx("flex flex-col", !StatusIcon && "w-full text-center items-center justify-center h-full")}>
-                            <h2 className={clsx("text-2xl font-bold", textColor)}>{title}</h2>
-                            <p className={clsx("text-sm font-medium opacity-80", textColor)}>{description}</p>
+                            <h2 className={clsx("text-2xl font-bold", textColor)}>{statusTitle}</h2>
+                            <p className={clsx("text-sm font-medium opacity-80", textColor)}>{statusDesc}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Activity Summary Card */}
-                <div className="bg-gray-100 rounded-[2rem] p-6 shadow-sm border border-gray-200 flex-1">
+                <div className="bg-white rounded-[2rem] p-6 shadow-lg border border-gray-100 flex-1">
                     <h3 className="text-[#0D9488] font-bold text-sm mb-4">Activity Summary</h3>
 
                     <div className="space-y-3">
-                        {status === 'none' ? (
+                        {activities.length === 0 ? (
                             <div className="h-40 flex items-center justify-center text-gray-400 text-sm">
                                 No information.
                             </div>
                         ) : (
-                            // Mock List or Generated from Events
-                            <>
-                                {/* Display specific item if we have config data */}
-                                {config && (
-                                    <SummaryItem
-                                        icon={
-                                            config.eventType === 'sitting' ? Activity :
-                                                config.eventType === 'falling' ? Activity :
-                                                    config.eventType === 'laying' ? Activity : User
-                                        }
-                                        text={
-                                            config.eventType === 'sitting' ? 'นั่งเป็นเวลา 1.30 ชั่วโมง' :
-                                                config.eventType === 'falling' ? 'ตรวจพบการล้ม ผู้ได้รับบาดเจ็บไม่มีสติ' :
-                                                    config.eventType === 'laying' ? 'นอนพักผ่อน 30 นาที' :
-                                                        'ตรวจพบกิจกรรมปกติ'
-                                        }
-                                        highlight={config.eventType === 'sitting' || config.eventType === 'falling'}
-                                    />
-                                )}
-
-                                {/* Add some filler items for "Normal" look if needed, or specific items */}
-                                <SummaryItem icon={Clock} text="เดินล่าสุดเมื่อ 2 ชั่วโมงที่แล้ว" />
-                                <SummaryItem icon={Eye} text="จ้องหน้าจอมาเป็นเวลา 0.30 ชั่วโมง" />
-                                <SummaryItem icon={User} text="เวลานอนทั้งหมดเวลา 8 ชั่วโมง" />
-                            </>
+                            activities.map((item, index) => (
+                                <SummaryItem
+                                    key={index}
+                                    icon={item.icon}
+                                    text={item.text}
+                                    highlight={item.highlight}
+                                />
+                            ))
                         )}
                     </div>
                 </div>
@@ -154,7 +187,6 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                     >
                         Statistics
                     </button>
-
                 </div>
 
             </div>
@@ -168,10 +200,10 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
 const SummaryItem: React.FC<{ icon: React.ElementType, text: string, highlight?: boolean }> = ({ icon: Icon, text, highlight }) => (
     <div className={clsx(
         "flex items-center gap-3 p-3 rounded-xl transition-colors",
-        highlight ? "bg-white shadow-sm" : "bg-gray-200/50"
+        highlight ? "bg-gray-200/80" : "bg-gray-100" // Highlight (Warning/Bad) gets darker gray background as per design mock
     )}>
-        <Icon className={clsx("w-5 h-5", highlight ? "text-[#0D9488]" : "text-gray-500")} />
-        <span className={clsx("text-xs font-bold", highlight ? "text-gray-800" : "text-gray-500")}>
+        <Icon className={clsx("w-5 h-5", highlight ? "text-[#0D9488]" : "text-[#0D9488]")} />
+        <span className={clsx("text-xs font-bold", "text-gray-600")}>
             {text}
         </span>
     </div>

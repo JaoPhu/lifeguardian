@@ -32,7 +32,9 @@ import ProfileScreen from './components/profile/ProfileScreen';
 function App() {
     const [currentScreen, setCurrentScreen] = useState<'splash' | 'welcome' | 'pre-login' | 'register' | 'forgot-password' | 'otp-verification' | 'reset-password' | 'password-changed' | 'social-google' | 'social-apple' | 'edit-profile' | 'login' | 'main'>('splash');
     const [activeTab, setActiveTab] = useState<'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications'>('overview');
-    const [settingsView, setSettingsView] = useState<'main' | 'ai-debug' | 'profile'>('main');
+
+    const [profileMode, setProfileMode] = useState<'closed' | 'view' | 'edit'>('closed');
+    const [settingsView, setSettingsView] = useState<'main' | 'ai-debug'>('main');
     const [simulationState, setSimulationState] = useState<'setup' | 'running'>('setup');
     const [isDemoActive, setIsDemoActive] = useState(false);
     const [activeEventCameraId, setActiveEventCameraId] = useState<string | null>(null);
@@ -40,7 +42,7 @@ function App() {
     const [showStatistics, setShowStatistics] = useState(false);
 
     // Navigation History State
-    const [previousTab, setPreviousTab] = useState<'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications' | null>(null);
+    // const [previousTab, setPreviousTab] = useState<'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications' | null>(null);
 
     // Data State
     const [currentConfig, setCurrentConfig] = useState<VideoConfig | null>(null);
@@ -156,8 +158,18 @@ function App() {
         setActiveEventCameraId(null);
     };
 
+    const handleConfigUpdate = useCallback((updates: Partial<VideoConfig>) => {
+        setCurrentConfig(prev => prev ? { ...prev, ...updates } : null);
+    }, []);
+
     const handleTabChange = (tab: 'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications') => {
+        // If leaving overview while simulation is running, save it first
+        if (activeTab === 'overview' && tab !== 'overview' && isDemoActive && simulationState === 'running') {
+            handleStopSimulation();
+        }
+
         setActiveTab(tab);
+        setProfileMode('closed'); // Close profile when changing tabs
         setShowStatistics(false); // Reset statistics view when changing tabs
         if (tab === 'status' && !selectedStatusCameraId) {
             // If switching to status manually, default to demo or first cam
@@ -199,9 +211,7 @@ function App() {
     };
 
     const handleOpenProfile = () => {
-        setPreviousTab(activeTab); // Store current tab before navigating
-        setSettingsView('profile');
-        setActiveTab('settings');
+        setProfileMode('view');
     };
 
     const renderContent = () => {
@@ -319,178 +329,172 @@ function App() {
         return (
             <div className={clsx("flex flex-col h-full transition-colors duration-300", isDarkMode ? "dark bg-gray-900" : "bg-white")}>
                 <div className="flex-1 overflow-hidden relative flex flex-col">
-                    {/* Main (Overview/Home) Tab Content */}
-                    {activeTab === 'overview' && (
-                        <div className="h-full flex flex-col">
-                            {activeEventCameraId ? (
-                                // Events Screen View
-                                <EventsScreen
-                                    camera={cameras.find(c => c.id === activeEventCameraId) || cameras[0]}
-                                    onBack={handleBackFromEvents}
-                                    onOpenNotifications={handleOpenNotifications}
-                                    onOpenProfile={handleOpenProfile}
-                                    hasUnread={hasUnread}
-                                    onViewStatus={() => {
-                                        if (activeEventCameraId) {
-                                            setSelectedStatusCameraId(activeEventCameraId);
-                                            setActiveTab('status');
-                                            setActiveEventCameraId(null); // Leave events screen
-                                        }
-                                    }}
-                                />
-                            ) : isDemoActive ? (
-                                // Simulation/Demo View
+                    {/* Global Profile Overlay */}
+                    {profileMode === 'view' ? (
+                        <ProfileScreen
+                            onBack={() => setProfileMode('closed')}
+                            onEdit={() => setProfileMode('edit')}
+                        />
+                    ) : profileMode === 'edit' ? (
+                        <EditProfileScreen
+                            onBack={() => setProfileMode('view')}
+                            onComplete={() => setProfileMode('view')}
+                        />
+                    ) : (
+                        <>
+                            {/* Main (Overview/Home) Tab Content */}
+                            {activeTab === 'overview' && (
                                 <div className="h-full flex flex-col">
-                                    {isAnalyzing ? (
-                                        // AI Analysis Loading Screen
-                                        <div className="flex-1 flex flex-col items-center justify-center bg-white p-8 text-center space-y-6">
-                                            <div className="relative">
-                                                <div className="w-24 h-24 rounded-full border-4 border-gray-100"></div>
-                                                <div className="absolute inset-0 rounded-full border-4 border-[#0D9488] border-t-transparent animate-spin"></div>
-                                                <Activity className="absolute inset-0 m-auto w-10 h-10 text-[#0D9488] animate-pulse" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-xl font-bold text-gray-800">AI Analyzing Video...</h2>
-                                                <p className="text-gray-500 text-sm mt-2">LifeGuardian AI is detecting events and potential risks.</p>
-                                            </div>
-                                        </div>
-                                    ) : simulationState === 'setup' ? (
-                                        <div className="flex-1 overflow-y-auto scrollbar-hide">
-                                            <DemoSetup
-                                                onStart={handleStartSimulation}
-                                                onOpenNotifications={handleOpenNotifications}
-                                                hasUnread={hasUnread}
-                                            />
-                                            {/* Show events below setup if any exist (optional, maybe remove for cleaner UI) */}
+                                    {activeEventCameraId ? (
+                                        // Events Screen View
+                                        <EventsScreen
+                                            camera={cameras.find(c => c.id === activeEventCameraId) || cameras[0]}
+                                            onBack={handleBackFromEvents}
+                                            onOpenNotifications={handleOpenNotifications}
+                                            onOpenProfile={handleOpenProfile}
+                                            hasUnread={hasUnread}
+                                        />
+                                    ) : isDemoActive ? (
+                                        // Simulation/Demo View
+                                        <div className="h-full flex flex-col">
+                                            {isAnalyzing ? (
+                                                // AI Analysis Loading Screen
+                                                <div className="flex-1 flex flex-col items-center justify-center bg-white p-8 text-center space-y-6">
+                                                    <div className="relative">
+                                                        <div className="w-24 h-24 rounded-full border-4 border-gray-100"></div>
+                                                        <div className="absolute inset-0 rounded-full border-4 border-[#0D9488] border-t-transparent animate-spin"></div>
+                                                        <Activity className="absolute inset-0 m-auto w-10 h-10 text-[#0D9488] animate-pulse" />
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-xl font-bold text-gray-800">AI Analyzing Video...</h2>
+                                                        <p className="text-gray-500 text-sm mt-2">LifeGuardian AI is detecting events and potential risks.</p>
+                                                    </div>
+                                                </div>
+                                            ) : simulationState === 'setup' ? (
+                                                <div className="flex-1 overflow-y-auto scrollbar-hide">
+                                                    <DemoSetup
+                                                        onStart={handleStartSimulation}
+                                                        onOpenNotifications={handleOpenNotifications}
+                                                        hasUnread={hasUnread}
+                                                    />
+                                                    {/* Show events below setup if any exist (optional, maybe remove for cleaner UI) */}
+                                                </div>
+                                            ) : (
+                                                currentConfig && (
+                                                    <SimulationRunning
+                                                        config={currentConfig}
+                                                        onStop={handleStopSimulation}
+                                                        onEventAdded={handleValidationEvent}
+                                                        onPostureChange={handlePostureChange}
+                                                        onConfigUpdate={handleConfigUpdate}
+                                                        onOpenNotifications={handleOpenNotifications}
+                                                        hasUnread={hasUnread}
+                                                    />
+                                                )
+                                            )}
                                         </div>
                                     ) : (
-                                        currentConfig && (
-                                            <SimulationRunning
-                                                config={currentConfig}
-                                                onStop={handleStopSimulation}
-                                                onEventAdded={handleValidationEvent}
-                                                onPostureChange={handlePostureChange}
-                                                onOpenNotifications={handleOpenNotifications}
-                                                hasUnread={hasUnread}
-                                            />
-                                        )
+                                        // Default Dashboard View
+                                        <Dashboard
+                                            cameras={cameras}
+                                            onTryDemo={handleTryDemo}
+                                            onViewEvents={handleViewEvents}
+                                            onDeleteCamera={handleDeleteCamera}
+                                            onOpenNotifications={handleOpenNotifications}
+                                            onOpenProfile={handleOpenProfile}
+                                            hasUnread={hasUnread}
+                                        />
                                     )}
                                 </div>
-                            ) : (
-                                // Default Dashboard View
-                                <Dashboard
-                                    cameras={cameras}
-                                    onTryDemo={handleTryDemo}
-                                    onViewEvents={handleViewEvents}
-                                    onDeleteCamera={handleDeleteCamera}
+                            )}
+
+                            {/* Statistics Tab (New 2nd Tab) */}
+                            {activeTab === 'statistics' && (
+                                (() => {
+                                    // Logic to get events for statistics (e.g. from demo camera)
+                                    const demoCam = cameras.find(c => c.source === 'demo');
+                                    const events = demoCam?.events || [];
+                                    return <StatisticsScreen events={events} onOpenProfile={handleOpenProfile} />;
+                                })()
+                            )}
+
+                            {/* Status Tab */}
+                            {activeTab === 'status' && (
+                                (() => {
+                                    // Shared Logic for Status & Statistics
+                                    // Derive status from the LAST applied config (or current one)
+                                    // Strategy: Find the latest 'demo' camera.
+                                    const demoCam = cameras.find(c => c.source === 'demo');
+
+                                    let status: MonitorStatus = 'none';
+                                    let config = demoCam?.config || null;
+                                    const events = demoCam?.events || [];
+
+                                    if (demoCam && demoCam.config) {
+                                        if (demoCam.config.eventType === 'falling') status = 'emergency';
+                                        else if (demoCam.config.eventType === 'sitting') status = 'warning';
+                                        else if (demoCam.config.eventType === 'laying') status = 'normal';
+                                        else status = 'normal';
+                                    }
+
+                                    // If user clicked "Statistics" button inside Status page, show it?
+                                    // Or maybe remove that button now that we have a tab?
+                                    // Let's keep logic compatible.
+                                    return showStatistics ? (
+                                        <StatisticsScreen events={events} onOpenProfile={handleOpenProfile} />
+                                    ) : (
+                                        <StatusScreen
+                                            status={status}
+                                            events={events}
+                                            config={config}
+                                            onShowStatistics={() => setShowStatistics(true)}
+                                            // Pass notification props
+                                            onOpenNotifications={handleOpenNotifications}
+                                            onOpenProfile={handleOpenProfile}
+                                            hasUnread={hasUnread}
+                                        />
+                                    );
+                                })()
+                            )}
+
+                            {/* Settings Tab */}
+                            {activeTab === 'settings' && (
+                                settingsView === 'main' ? (
+                                    <SettingsScreen
+                                        isDarkMode={isDarkMode}
+                                        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+                                        onNavigate={(screen) => {
+                                            if (screen === 'ai-debug') setSettingsView('ai-debug');
+                                            else if (screen === 'profile') {
+                                                setProfileMode('view');
+                                            }
+                                            else if (screen === 'overview') setActiveTab('overview');
+                                            else if (screen === 'status') setActiveTab('status');
+                                            else if (screen === 'statistics') setActiveTab('statistics');
+                                            // 'notification', 'users' -> no action yet
+                                        }} />
+                                ) : (
+                                    <AIDebugScreen onBack={() => setSettingsView('main')} />
+                                )
+                            )}
+
+                            {/* Notification History Screen */}
+                            {activeTab === 'notifications' && (
+                                <NotificationScreen
+                                    notifications={notifications}
+                                    onBack={() => setActiveTab('overview')}
+                                />
+                            )}
+
+                            {/* Users / Group Management Tab */}
+                            {activeTab === 'users' && (
+                                <GroupManagementScreen
                                     onOpenNotifications={handleOpenNotifications}
                                     onOpenProfile={handleOpenProfile}
                                     hasUnread={hasUnread}
                                 />
                             )}
-                        </div>
-                    )}
-
-                    {/* Statistics Tab (New 2nd Tab) */}
-                    {activeTab === 'statistics' && (
-                        (() => {
-                            // Logic to get events for statistics (e.g. from demo camera)
-                            const demoCam = cameras.find(c => c.source === 'demo');
-                            const events = demoCam?.events || [];
-                            return <StatisticsScreen events={events} onOpenProfile={handleOpenProfile} />;
-                        })()
-                    )}
-
-                    {/* Status Tab */}
-                    {activeTab === 'status' && (
-                        (() => {
-
-                            // Shared Logic for Status & Statistics
-                            // Derive status from the SELECTED camera (or default to demo)
-                            const targetCamera = cameras.find(c => c.id === selectedStatusCameraId) || cameras.find(c => c.source === 'demo') || cameras[0];
-
-                            let status: MonitorStatus = 'none';
-                            let config = targetCamera?.config || null;
-                            const events = targetCamera?.events || [];
-
-                            if (targetCamera && targetCamera.config) {
-                                // Simple Logic:
-                                // Falling -> Emergency
-                                // Sitting -> Warning (Assumed prolonged)
-                                // Laying -> Normal (Resting)
-                                if (targetCamera.config.eventType === 'falling') status = 'emergency';
-                                else if (targetCamera.config.eventType === 'sitting') status = 'warning';
-                                else if (targetCamera.config.eventType === 'laying') status = 'normal';
-                                else status = 'normal';
-                            }
-
-                            // If user clicked "Statistics" button inside Status page, show it?
-                            // Or maybe remove that button now that we have a tab?
-                            // Let's keep logic compatible.
-                            return showStatistics ? (
-                                <StatisticsScreen events={events} onOpenProfile={handleOpenProfile} />
-                            ) : (
-                                <StatusScreen
-                                    status={status}
-                                    events={events}
-                                    config={config}
-                                    onShowStatistics={() => setShowStatistics(true)}
-                                    // Pass notification props
-                                    onOpenNotifications={handleOpenNotifications}
-                                    onOpenProfile={handleOpenProfile}
-                                    hasUnread={hasUnread}
-                                />
-                            );
-                        })()
-                    )}
-
-                    {/* Settings Tab */}
-                    {activeTab === 'settings' && (
-                        settingsView === 'main' ? (
-                            <SettingsScreen
-                                isDarkMode={isDarkMode}
-                                onToggleTheme={() => setIsDarkMode(!isDarkMode)}
-                                onNavigate={(screen) => {
-                                    if (screen === 'ai-debug') setSettingsView('ai-debug');
-                                    else if (screen === 'profile') {
-                                        setPreviousTab('settings'); // Explicitly set previous to settings main
-                                        setSettingsView('profile');
-                                    }
-                                    else if (screen === 'overview') setActiveTab('overview');
-                                    else if (screen === 'status') setActiveTab('status');
-                                    else if (screen === 'statistics') setActiveTab('statistics');
-                                    // 'notification', 'users' -> no action yet
-                                }} />
-                        ) : settingsView === 'profile' ? (
-                            <ProfileScreen onBack={() => {
-                                if (previousTab && previousTab !== 'settings') {
-                                    setActiveTab(previousTab);
-                                    setPreviousTab(null);
-                                } else {
-                                    setSettingsView('main');
-                                    setPreviousTab(null);
-                                }
-                            }} />
-                        ) : (
-                            <AIDebugScreen onBack={() => setSettingsView('main')} />
-                        )
-                    )}
-
-                    {/* Notification History Screen */}
-                    {activeTab === 'notifications' && (
-                        <NotificationScreen
-                            notifications={notifications}
-                            onBack={() => setActiveTab('overview')}
-                        />
-                    )}
-
-                    {/* Users / Group Management Tab */}
-                    {activeTab === 'users' && (
-                        <GroupManagementScreen
-                            onOpenNotifications={handleOpenNotifications}
-                            onOpenProfile={handleOpenProfile}
-                            hasUnread={hasUnread}
-                        />
+                        </>
                     )}
                 </div>
 

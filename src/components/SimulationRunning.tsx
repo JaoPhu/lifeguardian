@@ -12,11 +12,11 @@ interface SimulationRunningProps {
     onEventAdded: (event: SimulationEvent) => void;
     onPostureChange?: (posture: 'standing' | 'sitting' | 'laying' | 'falling') => void;
     onOpenNotifications?: () => void;
+    onConfigUpdate?: (updates: Partial<VideoConfig>) => void;
     hasUnread?: boolean;
 }
 
-const SimulationRunning: React.FC<SimulationRunningProps> = (props) => {
-    const { config, onStop, onEventAdded, onOpenNotifications, hasUnread } = props;
+const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, onEventAdded, onPostureChange, onOpenNotifications, onConfigUpdate, hasUnread }) => {
     // Video / "Real" Time Logic
     // Default clip length = 5 minutes if not uploaded (as per request), or matches uploaded video
     const [videoTimeSec, setVideoTimeSec] = useState(0);
@@ -28,18 +28,46 @@ const SimulationRunning: React.FC<SimulationRunningProps> = (props) => {
     const requestRef = useRef<number>();
     const postureHistory = useRef<string[]>([]);
 
-    // Initialize Simulation Start Time
+    // Initialize Simulation Start Time - ANCHOR: Dependent only on ID to prevent feedback loop when we update config
     const startDateTime = React.useMemo(() => {
         const [hours, minutes] = config.startTime.split(':').map(Number);
         const d = new Date(config.date);
         d.setHours(hours, minutes, 0, 0);
         return d;
-    }, [config.startTime, config.date]);
+    }, [config.id]); // CRITICAL: Only re-calc if ID changes (new simulation), ignore updating date/time props
 
     // DERIVED Current Time (No longer state, avoids desync)
     // Formula: Start + (RealSeconds * Speed * 60 * 1000ms)
     // 1 Real Sec = 1 Sim Minute * Speed
     const currentTime = new Date(startDateTime.getTime() + (videoTimeSec * config.speed * 60 * 1000));
+
+    // FEEDBACK LOOP: Update App state with current simulated time so Status Screen sees it
+    useEffect(() => {
+        if (onConfigUpdate) {
+            // 1. Time & Date
+            const timeStr = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            const dateStr = currentTime.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            // 2. Duration Text (Formatted) based on SIMULATED TIME
+            // 1 Real Sec = 'config.speed' Minutes
+            const totalSimMinutes = videoTimeSec * config.speed;
+
+            const hours = Math.floor(totalSimMinutes / 60);
+            const minutes = Math.floor(totalSimMinutes % 60);
+
+            // Format as "H.MM ชั่วโมง" to match design request "unit is hours"
+            const durationStr = `${hours}.${minutes.toString().padStart(2, '0')} ชั่วโมง`;
+
+            // Avoid infinite re-renders by checking if changed (simple check)
+            if (config.startTime !== timeStr || config.date !== dateStr || config.durationText !== durationStr) {
+                onConfigUpdate({
+                    startTime: timeStr,
+                    date: dateStr,
+                    durationText: durationStr
+                });
+            }
+        }
+    }, [Math.floor(videoTimeSec), config.speed]); // Check every Real Second
 
     const [stickmanPosture, setStickmanPosture] = useState<'standing' | 'sitting' | 'laying' | 'falling'>('standing');
     const [hasTriggeredEvent, setHasTriggeredEvent] = useState(false);
@@ -135,7 +163,22 @@ const SimulationRunning: React.FC<SimulationRunningProps> = (props) => {
     };
 
     const handleVideoLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-        setVideoDuration(e.currentTarget.duration);
+        const duration = e.currentTarget.duration;
+        setVideoDuration(duration);
+
+        if (onConfigUpdate) {
+            // 2. Duration Text (Formatted) based on SIMULATED TIME
+            // 1 Real Sec = 'config.speed' Minutes
+            const totalSimMinutes = duration * config.speed; // Use total video duration for total simulated minutes
+
+            const hours = Math.floor(totalSimMinutes / 60);
+            const minutes = Math.floor(totalSimMinutes % 60);
+
+            // Format as "H.MM ชั่วโมง" to match design request "unit is hours"
+            const durationStr = `${hours}.${minutes.toString().padStart(2, '0')} ชั่วโมง`;
+
+            onConfigUpdate({ durationText: durationStr });
+        }
     };
 
     const handleVideoEnded = () => {
@@ -237,7 +280,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = (props) => {
                                 triggerEvent(detectedPosture, isCritical);
 
                                 // Notify parent of change
-                                if (props.onPostureChange) props.onPostureChange(detectedPosture);
+                                if (onPostureChange) onPostureChange(detectedPosture);
                             }
                             return detectedPosture;
                         });
@@ -269,6 +312,8 @@ const SimulationRunning: React.FC<SimulationRunningProps> = (props) => {
     };
 
     const formattedTime = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formattedDate = currentTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }); // DD/MM/YYYY
+
     const progress = Math.min(100, Math.max(0, (videoTimeSec / (videoDuration || 1)) * 100)); // safe divide
 
     const currentVideoTimeStr = formatVideoTime(videoTimeSec);
@@ -383,7 +428,10 @@ const SimulationRunning: React.FC<SimulationRunningProps> = (props) => {
                         <span className="text-gray-500 font-bold text-sm">Time simulation</span>
                     </div>
 
-                    <div className="text-5xl font-bold text-gray-800 tracking-tight mb-4">{formattedTime}</div>
+                    <div className="flex flex-col items-center mb-4">
+                        <div className="text-5xl font-bold text-gray-800 tracking-tight">{formattedTime}</div>
+                        <div className="text-sm font-bold text-gray-400 mt-1">{formattedDate}</div>
+                    </div>
 
                     {/* Slider */}
                     <div className="w-full relative h-6 flex items-center mb-1">

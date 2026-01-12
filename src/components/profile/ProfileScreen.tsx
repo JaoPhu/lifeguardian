@@ -10,9 +10,10 @@ import MedicalHistory from './MedicalHistory';
 
 interface ProfileScreenProps {
     onBack: () => void;
+    onEdit?: () => void;
 }
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack, onEdit }) => {
     // Hardcoded data matching the image
     const profileData = {
         name: 'hewkai',
@@ -40,7 +41,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
                     name={profileData.name}
                     username={profileData.username}
                     avatarUrl={profileData.avatarUrl}
-                    onEdit={() => console.log('Edit Profile')}
+                    onEdit={onEdit}
                 />
 
                 <ProfileStats

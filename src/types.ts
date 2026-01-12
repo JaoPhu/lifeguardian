@@ -6,6 +6,7 @@ export interface VideoConfig {
   date: string;
   eventType?: 'sitting' | 'laying' | 'falling' | 'standing';
   videoUrl?: string;
+  durationText?: string;
 }
 
 export interface SimulationEvent {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { HeartPulse, Pill, X, LucideIcon } from 'lucide-react';
 
-interface MedicalHistoryItem {
+export interface MedicalHistoryItem {
     type: 'condition' | 'medication' | 'allergy_drug' | 'allergy_food';
     label: string;
     value: string;
