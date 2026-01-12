@@ -10,7 +10,7 @@ const PhoneFrame: React.FC<PhoneFrameProps> = ({ children }) => {
             <div className="relative w-full h-full sm:w-[393px] sm:h-[852px] bg-black sm:rounded-[50px] shadow-2xl sm:border-[14px] border-black overflow-hidden sm:ring-4 ring-gray-900/40 transition-all duration-300">
 
                 {/* Status Bar */}
-                <div className="absolute top-0 w-full h-11 px-6 flex items-center justify-between z-[60] pointer-events-none">
+                <div className="hidden sm:flex absolute top-0 w-full h-11 px-6 items-center justify-between z-[60] pointer-events-none">
                     {/* Time & ISP */}
                     <div className="flex items-center gap-1.5 min-w-[100px]">
                         <span className="text-[14px] font-bold text-gray-900 ml-2">9:41</span>
