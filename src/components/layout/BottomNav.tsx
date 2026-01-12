@@ -4,9 +4,10 @@ import clsx from 'clsx';
 interface BottomNavProps {
     activeTab: 'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications';
     onTabChange: (tab: 'overview' | 'statistics' | 'status' | 'users' | 'settings' | 'notifications') => void;
+    status?: 'none' | 'normal' | 'warning' | 'emergency';
 }
 
-const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, status: _status = 'normal' }) => {
     // Define tabs with consistent shape
     const tabs = [
         { id: 'overview', icon: Home, label: '', highlight: false },
@@ -25,7 +26,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
                     className={clsx(
                         "flex flex-col items-center justify-center transition-all duration-300",
                         tab.highlight
-                            ? "w-12 h-12 bg-gray-600 dark:bg-gray-700 rounded-full text-white shadow-lg -mt-2 hover:scale-105 active:scale-95"
+                            ? "w-12 h-12 bg-[#0D9488] rounded-full text-white shadow-lg -mt-2 hover:scale-105 active:scale-95 shadow-teal-500/40 transition-all duration-300"
                             : clsx(activeTab === tab.id ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400")
                     )}
                 >

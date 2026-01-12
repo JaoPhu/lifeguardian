@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Bell, Settings, Folder } from 'lucide-react';
-import { Camera } from '../../types';
+import { Camera, SimulationEvent } from '../../types';
+import { MonitorStatus } from '../StatusScreen';
+import clsx from 'clsx';
 
 interface DashboardProps {
     cameras: Camera[];
@@ -10,11 +12,12 @@ interface DashboardProps {
     onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
     hasUnread?: boolean;
+    calculateHealthStatus: (events: SimulationEvent[]) => { status: MonitorStatus, score: number };
 }
 
 import { useUser } from '../../contexts/UserContext';
 
-const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents, onDeleteCamera, onOpenNotifications, onOpenProfile, hasUnread }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents, onDeleteCamera, onOpenNotifications, onOpenProfile, hasUnread, calculateHealthStatus }) => {
     const { user } = useUser();
     const [openSettingsId, setOpenSettingsId] = useState<string | null>(null);
 
@@ -52,7 +55,18 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
                 {cameras.map((camera) => (
                     <div key={camera.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 pt-3 px-3 pb-2.5 relative transition-colors duration-300">
                         <div className="flex justify-between items-center px-2 mb-2">
-                            <span className="text-[#0D9488] font-bold text-sm">{camera.name}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[#0D9488] font-bold text-sm">{camera.name}</span>
+                                {camera.status === 'online' && (
+                                    <div className={clsx(
+                                        "w-2 h-2 rounded-full",
+                                        calculateHealthStatus(camera.events).status === 'emergency' ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
+                                            calculateHealthStatus(camera.events).status === 'warning' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" :
+                                                calculateHealthStatus(camera.events).status === 'none' ? "bg-gray-400" :
+                                                    "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                                    )} />
+                                )}
+                            </div>
 
                             {/* Settings / Delete Menu - Not available for default Camera 1 */}
                             {camera.id !== 'cam-01' && (
@@ -191,34 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cameras, onTryDemo, onViewEvents,
                     </div>
                 ))}
 
-                {/* Fallback Camera 1 if list is empty AND no joined groups */}
-                {cameras.length === 0 && (!user.joinedGroups || user.joinedGroups.length === 0) && (
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 pt-3 px-3 pb-2.5 transition-colors duration-300">
-
-                        <div className="flex justify-between items-center px-2 mb-2">
-                            <span className="text-[#0D9488] font-bold text-sm">Camera 1</span>
-                        </div>
-                        <div className="bg-[#D9D9D9] dark:bg-gray-600 aspect-video rounded-lg flex flex-col items-center justify-center gap-1 mb-2">
-                            <p className="font-bold text-sm text-[#8F9197] dark:text-gray-400">No connection</p>
-                            <p className="text-[10px] text-[#8F9197] dark:text-gray-400">This function is not available.</p>
-                        </div>
-                        <div className="flex items-center px-1 mb-2">
-                            <span className="text-[10px] text-gray-500 font-bold flex-1"></span>
-
-                            <div className="flex justify-center items-center flex-1 h-9">
-                                <button
-                                    disabled={true}
-                                    className="flex items-center gap-1 text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50"
-                                >
-                                    <Folder className="w-4 h-4" />
-                                    <span className="text-sm font-bold">Events</span>
-                                </button>
-                            </div>
-
-                            <span className="text-[10px] text-gray-400 lowercase flex-1 text-right">camera</span>
-                        </div>
-                    </div>
-                )}
+                {/* Joined group cameras will show up here */}
 
 
                 <div className="flex justify-center mt-6">

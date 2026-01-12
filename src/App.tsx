@@ -58,8 +58,92 @@ function App() {
     // AI Analysis State
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Camera List State (Initialized empty, removed dummy Camera 1)
-    const [cameras, setCameras] = useState<Camera[]>([]);
+    // Health Scoring Logic (Internal)
+    const calculateHealthStatus = useCallback((cameraEvents: SimulationEvent[]): { status: MonitorStatus, score: number } => {
+        // If no events, return 'none' status immediately
+        if (!cameraEvents || cameraEvents.length === 0) {
+            return { status: 'none', score: 1000 };
+        }
+
+        let score = 1000;
+
+        // Helper to parse duration string "X.XX hr" to minutes
+        const parseDurationToMinutes = (durationStr?: string) => {
+            if (!durationStr) return 0;
+            const hours = parseFloat(durationStr.replace(' hr', ''));
+            return Math.round(hours * 60);
+        };
+
+        // Filter and Calculate Duration for TODAY
+        const now = new Date();
+        const dayStart = new Date(now);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(now);
+        dayEnd.setHours(24, 0, 0, 0);
+
+        cameraEvents.forEach(e => {
+            // For Falling, it's an event instance impact (critical)
+            if (e.type === 'falling') {
+                const [y, m, d] = (e.date || '2000-01-01').split('-').map(Number);
+                // Check if fall happened Today
+                if (now.getFullYear() === y && now.getMonth() === m - 1 && now.getDate() === d) {
+                    score -= 600;
+                }
+                return;
+            }
+
+            // For others, calculate effective duration today
+            if (!e.date || !e.timestamp) return;
+
+            // Parse Event Start
+            const [y, m, d] = e.date.split('-').map(Number);
+            const [hh, mm] = e.timestamp.split(':').map(Number);
+            const eventStart = new Date(y, m - 1, d, hh, mm);
+
+            // Parse Duration & End
+            const durationMins = parseDurationToMinutes(e.duration);
+            if (durationMins <= 0) return;
+
+            const eventEnd = new Date(eventStart.getTime() + durationMins * 60000);
+
+            // Check Overlap with Today
+            const overlapStart = eventStart < dayStart ? dayStart : eventStart;
+            const overlapEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
+
+            if (overlapEnd > overlapStart) {
+                const effectiveMins = (overlapEnd.getTime() - overlapStart.getTime()) / 60000;
+                const effectiveHours = effectiveMins / 60;
+
+                switch (e.type) {
+                    case 'sitting': score -= 50 * effectiveHours; break;
+                    case 'laying': score -= 75 * effectiveHours; break;
+                    case 'walking': score += 25 * effectiveHours; break;
+                    case 'standing': score += 5 * effectiveHours; break;
+                }
+            }
+        });
+
+        // Clamp score
+        score = Math.max(0, Math.min(1000, score));
+
+        // Map to Status
+        let status: MonitorStatus = 'normal';
+        if (score < 500) status = 'emergency';
+        else if (score < 800) status = 'warning';
+
+        return { status, score };
+    }, []);
+
+    // Camera List State (Managed by App)
+    const [cameras, setCameras] = useState<Camera[]>([
+        {
+            id: 'cam-01',
+            name: 'Camera 1',
+            status: 'offline',
+            source: 'camera',
+            events: []
+        }
+    ]);
 
     // Handlers
     const handleSplashFinish = () => setCurrentScreen('welcome');
@@ -105,6 +189,25 @@ function App() {
         // When stopped (or finished), we save the session as a new "Camera" source
         const finalConfig = configRef.current;
         if (finalConfig) {
+            // Calculate final event duration if needed
+            if (eventsRef.current.length > 0) {
+                const lastEvent = eventsRef.current[0];
+                if (!lastEvent.duration) {
+                    // Calculate duration
+                    const currentSimTimeStr = finalConfig.startTime; // This has been fed back from SimRunning
+                    const startParts = lastEvent.timestamp.split(':').map(Number);
+                    const endParts = currentSimTimeStr.split(':').map(Number);
+
+                    let diffMins = (endParts[0] * 60 + endParts[1]) - (startParts[0] * 60 + startParts[1]);
+                    if (diffMins < 0) diffMins += 24 * 60; // Handle midnight wrap
+
+                    const hrs = (diffMins / 60).toFixed(2);
+                    const durationStr = `${hrs} hr`;
+
+                    eventsRef.current[0] = { ...lastEvent, duration: durationStr };
+                }
+            }
+
             setCameras(prev => {
                 let newName = finalConfig.cameraName;
                 let counter = 1;
@@ -118,7 +221,7 @@ function App() {
                     name: newName,
                     source: 'demo',
                     status: 'online',
-                    events: [...eventsRef.current], // Read from ref
+                    events: [...eventsRef.current], // Read from ref, which now has updated last event
                     config: finalConfig
                 };
                 return [newCamera, ...prev];
@@ -130,14 +233,45 @@ function App() {
     }, []); // No dependencies! Stable forever.
 
     const handleValidationEvent = useCallback((event: SimulationEvent) => {
-        setEvents(prev => [event, ...prev]);
+        setEvents(prev => {
+            // Prevent duplicate consecutive events (e.g. Sitting -> Sitting)
+            if (prev.length > 0 && prev[0].type === event.type) {
+                return prev;
+            }
+
+            const newEvents = [event, ...prev];
+
+            // If there was a previous event (now at index 1), calculate its duration
+            if (newEvents.length > 1) {
+                const prevEvent = newEvents[1];
+                if (!prevEvent.duration) {
+                    // Calculate duration: New Event Time - Prev Event Time
+                    // Assumes HH:MM format
+                    const startParts = prevEvent.timestamp.split(':').map(Number);
+                    const endParts = event.timestamp.split(':').map(Number);
+
+                    let diffMins = (endParts[0] * 60 + endParts[1]) - (startParts[0] * 60 + startParts[1]);
+
+                    // Handle midnight crossing or date roll over (basic)
+                    if (diffMins < 0) diffMins += 24 * 60;
+
+                    const hrs = (diffMins / 60).toFixed(2); // 2 decimal places for hours
+                    const durationStr = `${hrs} hr`;
+
+                    // Update the previous event with duration
+                    newEvents[1] = { ...prevEvent, duration: durationStr };
+                }
+            }
+            return newEvents;
+        });
+
         // Also update config eventType if it matches
         if (configRef.current) {
             setCurrentConfig({ ...configRef.current, eventType: event.type });
         }
     }, []);
 
-    const handlePostureChange = useCallback((posture: 'standing' | 'sitting' | 'laying' | 'falling') => {
+    const handlePostureChange = useCallback((posture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling') => {
         if (configRef.current && configRef.current.eventType !== posture) {
             setCurrentConfig({ ...configRef.current, eventType: posture });
         }
@@ -403,6 +537,7 @@ function App() {
                                             onOpenNotifications={handleOpenNotifications}
                                             onOpenProfile={handleOpenProfile}
                                             hasUnread={hasUnread}
+                                            calculateHealthStatus={calculateHealthStatus}
                                         />
                                     )}
                                 </div>
@@ -426,16 +561,9 @@ function App() {
                                     // Strategy: Find the latest 'demo' camera.
                                     const demoCam = cameras.find(c => c.source === 'demo');
 
-                                    let status: MonitorStatus = 'none';
-                                    let config = demoCam?.config || null;
                                     const events = demoCam?.events || [];
-
-                                    if (demoCam && demoCam.config) {
-                                        if (demoCam.config.eventType === 'falling') status = 'emergency';
-                                        else if (demoCam.config.eventType === 'sitting') status = 'warning';
-                                        else if (demoCam.config.eventType === 'laying') status = 'normal';
-                                        else status = 'normal';
-                                    }
+                                    const { status } = calculateHealthStatus(events);
+                                    let config = demoCam?.config || null;
 
                                     // If user clicked "Statistics" button inside Status page, show it?
                                     // Or maybe remove that button now that we have a tab?
@@ -506,7 +634,11 @@ function App() {
                 </div>
 
                 {/* Navigation Bar */}
-                <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+                <BottomNav
+                    activeTab={activeTab}
+                    onTabChange={handleTabChange}
+                    status={calculateHealthStatus(cameras.find(c => c.source === 'demo')?.events || events).status}
+                />
             </div>
         );
     };

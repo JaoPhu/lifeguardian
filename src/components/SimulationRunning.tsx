@@ -10,7 +10,7 @@ interface SimulationRunningProps {
     config: VideoConfig;
     onStop: () => void;
     onEventAdded: (event: SimulationEvent) => void;
-    onPostureChange?: (posture: 'standing' | 'sitting' | 'laying' | 'falling') => void;
+    onPostureChange?: (posture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling') => void;
     onOpenNotifications?: () => void;
     onConfigUpdate?: (updates: Partial<VideoConfig>) => void;
     hasUnread?: boolean;
@@ -76,7 +76,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         }
     }, [Math.floor(videoTimeSec), config.speed, isPlaying]); // Check every Real Second
 
-    const [stickmanPosture, setStickmanPosture] = useState<'standing' | 'sitting' | 'laying' | 'falling'>('standing');
+    const [stickmanPosture, setStickmanPosture] = useState<'standing' | 'walking' | 'sitting' | 'laying' | 'falling'>('standing');
 
     // Sitting Time Logic
     const [sittingTime, setSittingTime] = useState(0);
@@ -232,21 +232,40 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                     }
 
                     // 3. Logic Check
-                    const isFalling = poseDetectionService.isFalling(landmarks as any);
+                    const isLaying = poseDetectionService.isLaying(landmarks as any);
                     const isStanding = poseDetectionService.isStanding(landmarks as any);
+                    const isWalking = poseDetectionService.isWalking(landmarks as any);
 
-                    let detectedPosture: 'standing' | 'sitting' | 'laying' | 'falling' = 'sitting';
+                    let detectedPosture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling' = 'sitting';
 
-                    if (isFalling) {
-                        detectedPosture = 'falling';
+                    if (isLaying) {
+                        // Logic: If transitioning from standing/walking to laying suddenly, it's a FALL.
+                        const lastState = postureHistory.current?.[postureHistory.current.length - 1];
+                        if (lastState === 'standing' || lastState === 'walking') {
+                            detectedPosture = 'falling';
+                        } else {
+                            detectedPosture = 'laying';
+                        }
                     } else if (isStanding) {
                         detectedPosture = 'standing';
+                    } else if (isWalking) {
+                        detectedPosture = 'walking';
                     } else {
                         detectedPosture = 'sitting';
                     }
 
+                    // Filter out jitter (must be same posture for 3 frames to change, except for falling)
+                    let stablePosture = detectedPosture;
+                    if (postureHistory.current && postureHistory.current.length >= 3 && detectedPosture !== 'falling') {
+                        const last3 = postureHistory.current.slice(-3);
+                        const allSame = last3.every(p => p === detectedPosture);
+                        if (!allSame) {
+                            stablePosture = last3[last3.length - 1] as any;
+                        }
+                    }
+
                     // Helper to capture and trigger event
-                    const triggerEvent = (type: 'standing' | 'sitting' | 'laying' | 'falling', critical: boolean = false) => {
+                    const triggerEvent = (type: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling', critical: boolean = false) => {
                         // USE SIMULATED TIME
                         const simTime = new Date(startDateTime.getTime() + (videoRef.current ? videoRef.current.currentTime : videoTimeSec) * config.speed * 60 * 1000);
                         const timeStr = simTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -272,11 +291,23 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                             }
                         }
 
+                        const generateDescription = (type: string) => {
+                            switch (type) {
+                                case 'falling': return "Sudden postural collapse detected (Critical)";
+                                case 'standing': return "Subject is in a stable upright position";
+                                case 'walking': return "Subject is moving in the supervised area";
+                                case 'sitting': return "Subject is in a stable sitting posture";
+                                case 'laying': return "Subject is resting in a horizontal position";
+                                default: return "Activity pattern detected";
+                            }
+                        };
+
                         const newEvent: SimulationEvent = {
                             id: crypto.randomUUID(),
                             type: type,
                             timestamp: timeStr,
                             date: dateStr,
+                            description: generateDescription(type),
                             snapshotUrl: snapshotUrl,
                             isCritical: critical
                         };
@@ -285,7 +316,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
 
                     // --- SMOOTHING BUFFER ---
                     if (!postureHistory.current) postureHistory.current = [];
-                    postureHistory.current.push(detectedPosture);
+                    postureHistory.current.push(stablePosture);
                     if (postureHistory.current.length > 5) postureHistory.current.shift();
 
                     // Check if stable (all recent frames match)
@@ -331,7 +362,6 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
     const currentVideoTimeStr = formatVideoTime(videoTimeSec);
     const totalVideoDurationStr = formatVideoTime(videoDuration);
 
-    const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
 
     return (
         <div className="flex flex-col h-full bg-[#0D9488] relative">
@@ -390,9 +420,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                     </div>
 
                     {/* Content Area */}
-                    <div className={clsx("bg-black relative flex items-center justify-center overflow-hidden transition-all duration-500", !videoAspectRatio ? "aspect-[4/3]" : "max-h-[450px]")}
-                        style={videoAspectRatio ? { aspectRatio: videoAspectRatio } : {}}
-                    >
+                    <div className="bg-black relative flex items-center justify-center overflow-hidden w-full aspect-video transition-all duration-500">
                         {config.videoUrl ? (
                             <>
                                 <video
@@ -405,7 +433,6 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                                     onTimeUpdate={handleVideoTimeUpdate}
                                     onLoadedMetadata={(e) => {
                                         handleVideoLoadedMetadata(e);
-                                        setVideoAspectRatio(e.currentTarget.videoWidth / e.currentTarget.videoHeight);
                                         // Resize canvas to match video
                                         if (canvasRef.current) {
                                             canvasRef.current.width = e.currentTarget.videoWidth;

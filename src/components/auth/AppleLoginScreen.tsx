@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Mail, Lock, Eye, EyeOff, Check, UserCircle } from 'lucide-react';
 import clsx from 'clsx';
-import appleIcon from '../../assets/icons/apple.png';
 
 interface AppleLoginScreenProps {
     onBack: () => void;

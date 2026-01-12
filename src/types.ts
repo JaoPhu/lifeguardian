@@ -4,7 +4,7 @@ export interface VideoConfig {
   startTime: string; // HH:MM
   speed: number;
   date: string;
-  eventType?: 'sitting' | 'laying' | 'falling' | 'standing';
+  eventType?: 'sitting' | 'laying' | 'falling' | 'standing' | 'walking';
   videoUrl?: string;
   thumbnailUrl?: string; // Captured first frame
   durationText?: string;
@@ -13,11 +13,13 @@ export interface VideoConfig {
 
 export interface SimulationEvent {
   id: string;
-  type: 'sitting' | 'laying' | 'falling' | 'standing';
+  type: 'sitting' | 'laying' | 'falling' | 'standing' | 'walking';
   timestamp: string; // HH:MM format
   date?: string; // YYYY-MM-DD
+  description?: string; // e.g. "Abnormal horizontal rest detected"
   snapshotUrl: string; // Placeholder URL
   isCritical: boolean;
+  duration?: string; // e.g. "2 hrs", "30 mins"
 }
 
 export type UserRole = 'Owner' | 'Admin' | 'Viewer';

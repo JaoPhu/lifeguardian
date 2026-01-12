@@ -1,6 +1,6 @@
 import React from 'react';
 import { useUser } from '../contexts/UserContext';
-import { Bell, Check, AlertTriangle, Plus, Activity, User, Clock, Eye } from 'lucide-react';
+import { Bell, Check, AlertTriangle, Plus, Activity, User } from 'lucide-react';
 import clsx from 'clsx';
 import { SimulationEvent, VideoConfig } from '../types';
 
@@ -16,12 +16,21 @@ interface StatusScreenProps {
     hasUnread?: boolean;
 }
 
-const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStatistics, onOpenNotifications, onOpenProfile, hasUnread }) => {
+const StatusScreen: React.FC<StatusScreenProps> = ({ status, events, config, onShowStatistics, onOpenNotifications, onOpenProfile, hasUnread }) => {
     const { user } = useUser();
 
     // Mock Data Generator based on Status
     const getMockActivity = () => {
-        let uiConfig;
+        let uiConfig = {
+            statusTitle: 'Status : None',
+            statusDesc: 'No information.',
+            bg: 'bg-gray-100',
+            iconBg: 'bg-transparent',
+            icon: null as any,
+            textColor: 'text-gray-500',
+            iconColor: 'text-gray-400',
+            activities: [] as { icon: any, text: string, highlight: boolean }[]
+        };
 
         // 1. Determine base colors and default daily activities
         switch (status) {
@@ -34,12 +43,7 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                     icon: Check,
                     textColor: 'text-emerald-900',
                     iconColor: 'text-emerald-900',
-                    activities: [
-                        { icon: Activity, text: 'นั่งเป็นเวลา 1.30 ชั่วโมง', highlight: false },
-                        { icon: Clock, text: 'เดินล่าสุดเมื่อ 2 ชั่วโมงที่แล้ว', highlight: false },
-                        { icon: Eye, text: 'จ้องหน้าจอมาเป็นเวลา 0.30 ชั่วโมง', highlight: false },
-                        { icon: User, text: 'เวลานอนทั้งหมดเวลา 9 ชั่วโมง', highlight: false },
-                    ]
+                    activities: []
                 };
                 break;
             case 'warning':
@@ -51,12 +55,7 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                     icon: AlertTriangle,
                     textColor: 'text-amber-900',
                     iconColor: 'text-amber-900',
-                    activities: [
-                        { icon: Activity, text: 'นั่งเป็นเวลา 4.30 ชั่วโมง', highlight: true },
-                        { icon: User, text: 'ยังไม่ได้ทานอาหารมื้อเช้า', highlight: true },
-                        { icon: Eye, text: 'จ้องหน้าจอมาเป็นเวลา 3 ชั่วโมง', highlight: false },
-                        { icon: Clock, text: 'เวลานอนทั้งหมดเวลา 4 ชั่วโมง', highlight: false },
-                    ]
+                    activities: []
                 };
                 break;
             case 'emergency':
@@ -68,10 +67,7 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
                     icon: Plus,
                     textColor: 'text-white',
                     iconColor: 'text-white',
-                    activities: [
-                        { icon: User, text: 'ยังไม่ได้ทานอาหารมื้อเช้า', highlight: true },
-                        { icon: Activity, text: 'ตรวจพบการล้ม ผู้ได้รับบาดเจ็บไม่มีสติและไม่มีการขยับ', highlight: true },
-                    ]
+                    activities: []
                 };
                 break;
             default: // none
@@ -110,6 +106,49 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
             uiConfig.activities = [
                 { icon: activityIcon, text: activityText, highlight: isHighlight }
             ];
+        } else if (events && events.length > 0) {
+            // 3. Generate from Real Events if no specific config
+            const latestEvents = events.slice(0, 4);
+            uiConfig.activities = latestEvents.map(event => {
+                let text = '';
+                let Icon = Activity;
+                let highlight = event.isCritical;
+
+                // Thai translation & formatting
+                const durationTxt = event.duration ? ` (${event.duration})` : '';
+
+                switch (event.type) {
+                    case 'sitting':
+                        text = `นั่งทำงาน${durationTxt}`;
+                        Icon = Activity;
+                        break;
+                    case 'laying':
+                        text = `นอนพักผ่อน${durationTxt}`;
+                        Icon = User;
+                        break;
+                    case 'falling':
+                        text = `ตรวจพบการล้ม!${durationTxt}`;
+                        Icon = AlertTriangle;
+                        highlight = true;
+                        break;
+                    case 'walking':
+                        text = `เดิน${durationTxt}`;
+                        Icon = User;
+                        break;
+                    case 'standing':
+                        text = `ยืน${durationTxt}`;
+                        Icon = User;
+                        break;
+                    default:
+                        text = `กิจกรรม: ${event.type}`;
+                }
+
+                return {
+                    icon: Icon,
+                    text: text,
+                    highlight: highlight
+                };
+            });
         }
 
         return { ...uiConfig };
@@ -143,17 +182,17 @@ const StatusScreen: React.FC<StatusScreenProps> = ({ status, config, onShowStati
 
                 {/* Status Card */}
                 <div className={clsx("w-full rounded-[2rem] p-6 shadow-md transition-colors duration-300 relative overflow-hidden", bg, status === 'none' && 'dark:bg-gray-800 dark:border dark:border-gray-700')}>
-                    <div className="flex items-center gap-4 relative z-10 h-32">
-                        {/* Status Icon Circle */}
+                    <div className="flex items-center gap-4 relative z-10">
+                        {/* Status Icon Circle (Left) */}
                         {StatusIcon && (
-                            <div className={clsx("w-20 h-20 rounded-full flex items-center justify-center backdrop-blur-sm", iconBg)}>
-                                <StatusIcon className={clsx("w-10 h-10", iconColor)} strokeWidth={3} />
+                            <div className={clsx("w-16 h-16 rounded-full flex items-center justify-center backdrop-blur-sm shrink-0", iconBg)}>
+                                <StatusIcon className={clsx("w-8 h-8", iconColor)} strokeWidth={3} />
                             </div>
                         )}
 
-                        {/* Text */}
-                        <div className={clsx("flex flex-col", !StatusIcon && "w-full text-center items-center justify-center h-full")}>
-                            <h2 className={clsx("text-2xl font-bold", textColor)}>{statusTitle}</h2>
+                        {/* Text (Right) */}
+                        <div className={clsx("flex flex-col flex-1", !StatusIcon && "text-center items-center justify-center")}>
+                            <h2 className={clsx("text-xl font-bold mb-0.5", textColor)}>{statusTitle}</h2>
                             <p className={clsx("text-sm font-medium opacity-80", textColor)}>{statusDesc}</p>
                         </div>
                     </div>

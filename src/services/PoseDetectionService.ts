@@ -14,6 +14,8 @@ export interface PoseLandmark {
 export class PoseDetectionService {
     private poseLandmarker: PoseLandmarker | null = null;
     private runningMode: "IMAGE" | "VIDEO" = "VIDEO";
+    private lastLandmarks: PoseLandmark[] | null = null;
+    private smoothingFactor: number = 0.35; // Balance between lag and stability (0.1 = very stable but laggy, 0.9 = jittery but fast)
 
     // Initialize the model
     async initialize() {
@@ -40,7 +42,29 @@ export class PoseDetectionService {
         if (!this.poseLandmarker) return null;
 
         const result = this.poseLandmarker.detectForVideo(video, startTimeMs);
-        return result.landmarks[0] ?? null; // Return first person detected or null
+        const currentLandmarks = result.landmarks[0] ?? null;
+
+        if (!currentLandmarks) {
+            this.lastLandmarks = null;
+            return null;
+        }
+
+        // Apply Smoothing (Exponential Moving Average)
+        if (!this.lastLandmarks || this.lastLandmarks.length !== currentLandmarks.length) {
+            this.lastLandmarks = currentLandmarks;
+        } else {
+            this.lastLandmarks = currentLandmarks.map((point, i) => {
+                const lastPoint = this.lastLandmarks![i];
+                return {
+                    x: point.x * this.smoothingFactor + lastPoint.x * (1 - this.smoothingFactor),
+                    y: point.y * this.smoothingFactor + lastPoint.y * (1 - this.smoothingFactor),
+                    z: point.z * this.smoothingFactor + lastPoint.z * (1 - this.smoothingFactor),
+                    visibility: point.visibility * this.smoothingFactor + lastPoint.visibility * (1 - this.smoothingFactor)
+                };
+            });
+        }
+
+        return this.lastLandmarks;
     }
 
     // --- LOGIC: Fall Detection ---
@@ -85,26 +109,22 @@ export class PoseDetectionService {
         return angleDeg;
     }
 
-    isFalling(landmarks: PoseLandmark[]): boolean {
+    isLaying(landmarks: PoseLandmark[]): boolean {
         if (!landmarks || landmarks.length < 33) return false;
-
         const torsoAngle = this.getTorsoAngle(landmarks);
-
-        // Aspect Ratio Check: If the bounding box is significantly WIDER than TALL, likely lying down.
         const xValues = landmarks.map(l => l.x);
         const yValues = landmarks.map(l => l.y);
         const width = Math.max(...xValues) - Math.min(...xValues);
         const height = Math.max(...yValues) - Math.min(...yValues);
+        const isFlat = width > height * 1.4;
+        return torsoAngle < 25 || isFlat;
+    }
 
-        // Horizontal Check: Must be significantly flat. 
-        // 1.25 ratio filters out "squarish" sitting postures but catches "starfish" lying.
-        const isFlat = width > height * 1.25;
-
-        // Threshold 45 degrees:
-        // - < 45 catches most falls.
-        // - prevents sitting lean (usually > 55-60) from triggering.
-        // - isFlat (backup) catches diagonal falls where angle might be borderline.
-        return torsoAngle < 45 || isFlat;
+    isFalling(landmarks: PoseLandmark[]): boolean {
+        // Falling is more about the transition, but statically we catch the result.
+        // For this prototype, we'll treat a very sudden horizontal as falling, 
+        // and stable horizontal as laying.
+        return this.isLaying(landmarks);
     }
 
     private getLegStraightness(landmarks: PoseLandmark[]): number {
@@ -141,29 +161,19 @@ export class PoseDetectionService {
 
     isStanding(landmarks: PoseLandmark[]): boolean {
         if (!landmarks || landmarks.length < 33) return false;
-
         const torsoAngle = this.getTorsoAngle(landmarks);
-
-        // Must be upright
         if (torsoAngle < 60) return false;
-
-        // Check Aspect Ratio
-        const xValues = landmarks.map(l => l.x);
-        const yValues = landmarks.map(l => l.y);
-        const width = Math.max(...xValues) - Math.min(...xValues);
-        const height = Math.max(...yValues) - Math.min(...yValues);
-        const ratio = height / width;
-
-        // Check Leg Straightness
-        // Standing = Legs are mostly straight (Angle between Hip-Knee and Knee-Ankle is low, < 40 deg deviation)
         const legBend = this.getLegStraightness(landmarks);
-        const isLegsStraight = legBend < 40;
+        return legBend < 25; // Very straight
+    }
 
-        // Strategy: 
-        // If Ratio is very tall (> 1.5), likely standing side/profile.
-        // If Ratio is normal but Legs Straight, definitely standing.
-
-        return ratio > 1.2 || isLegsStraight;
+    isWalking(landmarks: PoseLandmark[]): boolean {
+        if (!landmarks || landmarks.length < 33) return false;
+        const torsoAngle = this.getTorsoAngle(landmarks);
+        if (torsoAngle < 60) return false;
+        const legBend = this.getLegStraightness(landmarks);
+        // Walking involves more knee bend than pure standing
+        return legBend >= 25 && legBend < 65;
     }
 
 

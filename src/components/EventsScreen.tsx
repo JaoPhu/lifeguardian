@@ -1,7 +1,6 @@
 import React from 'react';
 import { useUser } from '../contexts/UserContext';
 import { Bell, ChevronLeft } from 'lucide-react';
-import clsx from 'clsx';
 
 import { Camera } from '../types';
 import StickmanViewer from './simulation/StickmanViewer';
@@ -56,39 +55,56 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotif
             {/* Content */}
             <div className="flex-1 px-4 pt-4 z-20 space-y-6 overflow-y-auto pb-20 scrollbar-hide">
 
-                {/* Events of Camera Card */}
+                {/* Events of Camera Card - Horizontal Scroll Gallery */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 transition-colors duration-300">
-                    <h2 className="text-[#0D9488] dark:text-teal-400 font-bold text-sm mb-3">Events of {camera.name}</h2>
+                    <h2 className="text-[#0D9488] dark:text-teal-400 font-bold text-sm mb-3">Events of Camera view : {camera.name}</h2>
 
-                    <div className="grid grid-cols-4 gap-2">
-                        {/* Show actual events if available, otherwise fallback or empty */}
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                         {camera.events.length > 0 ? (
-                            camera.events.slice(0, 4).map((event) => (
-                                <div key={event.id} className="flex flex-col items-center gap-1">
-                                    <div className="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-center border border-gray-100 dark:border-gray-700 overflow-hidden relative">
-                                        {event.snapshotUrl ? (
-                                            <img src={event.snapshotUrl} alt={event.type} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <StickmanViewer posture={event.type} className={clsx("w-10 h-10", event.type === 'falling' ? "text-amber-500" : "text-yellow-400")} />
-                                        )}
-                                        <div className="absolute top-1 right-1 text-[8px] text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md font-mono border border-white/10">
-                                            {event.timestamp}
+                            camera.events.map((event) => {
+                                // Dynamic label / Stickman
+                                let label: string = event.type;
+                                if (event.type === 'sitting') label = 'Sitting';
+                                else if (event.type === 'standing') label = 'Stand up';
+                                else if (event.type === 'laying') label = 'Sitting sleep';
+
+                                return (
+                                    <div key={event.id} className="flex flex-col items-center gap-2 min-w-[6rem]">
+                                        <div className="w-24 h-24 bg-[#778B91] rounded-xl flex items-center justify-center relative overflow-hidden shadow-sm">
+                                            {/* Snapshot or Stickman */}
+                                            <div className="w-full h-full relative">
+                                                {event.snapshotUrl ? (
+                                                    <img
+                                                        src={event.snapshotUrl}
+                                                        alt={label}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full p-4">
+                                                        <StickmanViewer posture={event.type} className="text-[#FFCB4C] w-full h-full" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Time Tag */}
+                                            <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-[2px] rounded text-[10px] text-white px-1.5 py-0.5 font-bold">
+                                                {event.timestamp}
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-gray-400 font-medium capitalize">{label}</span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            // Fallback Mock List if no events yet
+                            thumbnails.map((thumb, idx) => (
+                                <div key={idx} className="flex flex-col items-center gap-2 min-w-[6rem] opacity-40">
+                                    <div className="w-24 h-24 bg-[#778B91] rounded-xl flex items-center justify-center relative overflow-hidden">
+                                        <div className="w-16 h-20">
+                                            <StickmanViewer posture={thumb.posture} className="text-[#FFCB4C] w-full h-full" />
                                         </div>
                                     </div>
-
-                                    <span className="text-[10px] font-medium text-center leading-tight capitalize text-gray-500 dark:text-gray-400">
-                                        {event.type}
-                                    </span>
-                                </div>
-                            ))
-                        ) : (
-                            thumbnails.map((thumb, idx) => (
-                                <div key={idx} className="flex flex-col items-center gap-1 opacity-50">
-                                    <div className="w-full aspect-square bg-primary-950 rounded-lg flex items-center justify-center border border-primary-900 overflow-hidden relative">
-                                        <StickmanViewer posture={thumb.posture} className="text-yellow-400 w-10 h-10" />
-                                        <div className="absolute top-1 right-1 text-[8px] text-gray-500">Demo {4 - idx}</div>
-                                    </div>
-                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium text-center leading-tight">{thumb.label}</span>
+                                    <span className="text-xs text-gray-400 font-medium">{thumb.label}</span>
                                 </div>
                             ))
                         )}
@@ -115,9 +131,9 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotif
                                 const startDateStr = camera.config?.date || 'xxxx-xx-xx';
                                 const startTimeStr = camera.config?.startTime || '00:00';
 
-                                const sortedEvents = [...camera.events].reverse(); // Oldest to Newest
+                                // Sort oldest to newest for date tracking
+                                const sortedEvents = [...camera.events].reverse();
 
-                                // Parse safely to local time
                                 const [sYear, sMonth, sDay] = startDateStr.split('-').map(Number);
                                 let currentDate = new Date(sYear, sMonth - 1, sDay);
 
@@ -125,39 +141,46 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ camera, onBack, onOpenNotif
                                 const eventDates = new Map<string, string>(); // ID -> DateString
 
                                 sortedEvents.forEach(e => {
-                                    // Check for midnight crossing
-                                    if (e.timestamp < previousTime && Math.abs(parseInt(e.timestamp.split(':')[0]) - parseInt(previousTime.split(':')[0])) > 12) {
+                                    // Check for midnight crossing (Time drops significantly, e.g. 23:59 -> 00:01)
+                                    // Or simply if current timestamp is smaller than previous timestamp (assuming linear progression)
+                                    const prevParts = previousTime.split(':').map(Number);
+                                    const currParts = e.timestamp.split(':').map(Number);
+                                    const prevH = prevParts[0];
+                                    const currH = currParts[0];
+
+                                    // Heuristic: If time jumps backward by more than 12 hours, it's probably the next day (e.g. 23:00 -> 01:00)
+                                    // Or if it just jumps backward at all, it's likely next day given continuous recording? 
+                                    // Safe bet: > 12 hour diff implies wrap.
+                                    if (e.timestamp < previousTime && (prevH - currH) > 12) {
                                         currentDate.setDate(currentDate.getDate() + 1);
                                     }
                                     previousTime = e.timestamp;
 
-                                    // Format manually to avoid UTC shifts
                                     const y = currentDate.getFullYear();
                                     const m = (currentDate.getMonth() + 1).toString().padStart(2, '0');
                                     const d = currentDate.getDate().toString().padStart(2, '0');
                                     eventDates.set(e.id, `${y}-${m}-${d}`);
                                 });
 
-                                // Perform check: do we have > 1 unique date OR does simulation span multiple days?
-                                const uniqueDates = new Set(eventDates.values());
-                                const originalDate = camera.config?.originalDate || startDateStr;
-                                const currentDateStr = camera.config?.date || startDateStr;
-
-                                const showDate = uniqueDates.size > 1 || originalDate !== currentDateStr;
 
                                 return camera.events.map((event) => {
                                     const dateStr = eventDates.get(event.id);
-                                    // Format DD/MM/YYYY or similar? User image shows 2026/01/13.
-                                    // Let's use YYYY/MM/DD to match common dashboard style if possible, 
-                                    // but usually DD/MM is better for small row.
-                                    // Actually, let's use the format from the dashboard for consistency: YYYY/MM/DD
                                     const formattedDate = dateStr ? dateStr.replace(/-/g, '/') : '';
 
                                     return (
-                                        <div key={event.id} className="flex justify-between items-center border-b border-gray-50 dark:border-gray-700 pb-2 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 px-2 rounded-lg transition-colors">
-                                            <span className="font-bold text-sm capitalize text-gray-600 dark:text-gray-300">{event.type}</span>
-                                            <div className="flex items-center gap-2">
-                                                {showDate && <span className="text-gray-400 dark:text-gray-500 text-[10px]">{formattedDate}</span>}
+                                        <div key={event.id} className="flex justify-between items-start border-b border-gray-50 dark:border-gray-700 pb-3 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 px-2 rounded-lg transition-colors py-2">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm capitalize text-gray-600 dark:text-gray-300">{event.type}</span>
+                                                {event.duration && event.duration !== '0.00 hr' && (
+                                                    <span className="text-xs font-semibold text-[#0D9488] mt-0.5">Duration: {event.duration}</span>
+                                                )}
+                                                {event.description && (!event.duration || event.duration !== '0.00 hr') && (
+                                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight mt-1">{event.description}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col items-end gap-0.5">
+                                                {/* Always show date as requested */}
+                                                <span className="text-gray-400 dark:text-gray-500 text-[10px] font-medium">{formattedDate}</span>
                                                 <span className="text-gray-400 dark:text-gray-500 text-xs font-mono">{event.timestamp}</span>
                                             </div>
                                         </div>

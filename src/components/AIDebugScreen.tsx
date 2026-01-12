@@ -26,7 +26,6 @@ const AIDebugScreen: React.FC<AIDebugScreenProps> = ({ onBack }) => {
     const [minConfidence, setMinConfidence] = useState(0.5);
 
     const requestRef = useRef<number>();
-    const lastVideoTimeRef = useRef<number>(-1);
 
     // Sync state to refs
     useEffect(() => { isDetectingRef.current = isDetecting; }, [isDetecting]);

@@ -68,32 +68,26 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfi
         return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
     };
 
-    // Filter events for selected date
-    const dailyEvents = (events || []).filter(e => {
-        // Fallback for old data: assume 2026-01-13 if no e.date
-        const dateStr = e.date || '2026-01-13';
-        const [y, m, d] = dateStr.split('-').map(Number);
-        return selectedDate.getFullYear() === y &&
-            selectedDate.getMonth() === (m - 1) &&
-            selectedDate.getDate() === d;
-    });
-
-    const hasData = dailyEvents.length > 0;
-
-    // Helper to parse "HH:MM" to minutes from midnight
-    const parseTime = (timeStr: string) => {
-        const [h, m] = timeStr.split(':').map(Number);
-        return h * 60 + m;
+    // Helper to parse duration string "X.XX hr" to minutes
+    const parseDurationToMinutes = (durationStr?: string) => {
+        if (!durationStr) return 0;
+        // Handle "3.27 hr", "3.27hr", "3 hr", etc.
+        const cleanStr = durationStr.toLowerCase().replace('hr', '').trim().replace(',', '.');
+        const hours = parseFloat(cleanStr);
+        return isNaN(hours) ? 0 : Math.round(hours * 60);
     };
 
     // Helper to get color for state
     const getColorForState = (state: string) => {
-        switch (state) {
+        switch (state.toLowerCase()) {
             case 'sitting':
             case 'laying':
                 return '#3b82f6'; // Blue-500
             case 'falling':
                 return '#ef4444'; // Red-500
+            case 'walking':
+            case 'standing':
+                return '#10b981'; // Emerald-500
             default:
                 return '#e5e7eb'; // Gray-200
         }
@@ -101,61 +95,120 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfi
 
     // Calculate segments for the timeline
     const timelineSegments: { name: string; value: number; color: string }[] = [];
-    let cursorTime = 0; // Minutes from 00:00
-    let currentState: 'sitting' | 'laying' | 'falling' | 'standing' | 'unknown' = 'unknown';
 
-    // Sort events by time
-    const timeEvents = dailyEvents
-        .map(e => ({ ...e, minutes: parseTime(e.timestamp) }))
-        .sort((a, b) => a.minutes - b.minutes);
+    // 1. Find all events that overlap with the selected date (00:00 - 24:00)
+    const dayStart = new Date(selectedDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(selectedDate);
+    dayEnd.setHours(24, 0, 0, 0); // Next day 00:00
 
-    timeEvents.forEach(e => {
-        const duration = e.minutes - cursorTime;
-        if (duration > 0) {
-            timelineSegments.push({
-                name: currentState,
-                value: duration,
-                color: getColorForState(currentState)
+    const todaysSegments: { start: number; end: number; type: string }[] = [];
+
+    (events || []).forEach(e => {
+        if (!e.date || !e.timestamp) return;
+
+        // Parse Event Start
+        const [y, m, d] = e.date.split('-').map(Number);
+        const [hh, mm] = e.timestamp.split(':').map(Number);
+        const eventStart = new Date(y, m - 1, d, hh, mm);
+
+        // Parse Duration & End
+        const durationMins = parseDurationToMinutes(e.duration);
+        if (durationMins <= 0) return; // Skip instantaneous or invalid events for chart
+
+        const eventEnd = new Date(eventStart.getTime() + durationMins * 60000);
+
+        // Check Overlap
+        const overlapStart = eventStart < dayStart ? dayStart : eventStart;
+        const overlapEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
+
+        if (overlapEnd > overlapStart) {
+            // Convert to minutes from midnight (0 - 1440)
+            const startMins = Math.floor((overlapStart.getTime() - dayStart.getTime()) / 60000);
+            const endMins = Math.floor((overlapEnd.getTime() - dayStart.getTime()) / 60000);
+
+            todaysSegments.push({
+                start: startMins,
+                end: endMins,
+                type: e.type.toLowerCase().trim()
             });
         }
-        cursorTime = e.minutes;
-        currentState = e.type;
     });
 
-    // Fill from last event to Now (or 24h)
-    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-    const isToday = selectedDate.getDate() === new Date().getDate();
-    const limitTime = isToday ? nowMinutes : 24 * 60; // If today, up to now. If past, up to 24h.
+    // 2. Sort segments by start time
+    todaysSegments.sort((a, b) => a.start - b.start);
 
-    if (cursorTime < limitTime) {
-        const duration = limitTime - cursorTime;
+    // 3. Build continuous timeline with gaps
+    let cursorTime = 0; // Minutes from 00:00
+
+    todaysSegments.forEach(seg => {
+        // Gap before this segment
+        if (seg.start > cursorTime) {
+            timelineSegments.push({
+                name: 'Empty',
+                value: seg.start - cursorTime,
+                color: '#ffffff' // White for empty space
+            });
+        }
+
+        // The segment itself
+        // Handle overlaps? (Simple case: assume sequential or prioritize latest)
+        // For strictly correct visualization if overlaps exist, logic gets complex. 
+        // Assuming "lifeguardian" events don't overlap (single camera subject).
+        // But if they technically overlap due to slight data errors, clamp it using new cursor.
+        const effectiveStart = Math.max(cursorTime, seg.start);
+        const duration = seg.end - effectiveStart;
+
+        if (duration > 0) {
+            timelineSegments.push({
+                name: seg.type,
+                value: duration,
+                color: getColorForState(seg.type)
+            });
+            cursorTime = effectiveStart + duration;
+        }
+    });
+
+    // 4. Fill remaining day
+    if (cursorTime < 24 * 60) {
         timelineSegments.push({
-            name: currentState,
-            value: duration,
-            color: getColorForState(currentState)
+            name: 'Empty',
+            value: (24 * 60) - cursorTime,
+            color: '#ffffff'
         });
-        cursorTime = limitTime;
     }
 
-    // Fill remaining day (future) if today
-    if (isToday && cursorTime < 24 * 60) {
-        // Future is white
-        timelineSegments.push({ name: 'Future', value: (24 * 60) - cursorTime, color: '#ffffff' });
-    }
+    // Determine hasData for the UI states
+    const hasData = todaysSegments.length > 0;
+
+    // Recalculate counts based on DURATION (Hours)
+    // Filter segments for explicit types and sum up duration
+    const getDurationHours = (types: string[]) => {
+        const totalMins = todaysSegments
+            .filter(s => types.includes(s.type))
+            .reduce((acc, curr) => acc + (curr.end - curr.start), 0);
+        return (totalMins / 60).toFixed(1);
+    };
+
+    const relaxHours = getDurationHours(['sitting', 'laying']);
+    const workHours = getDurationHours(['working']); // Assuming 'working' type exists or is mapped
+    const walkHours = getDurationHours(['walking', 'standing']);
+
+    // Falls are point events, keep count based on start date matching
+    const fallCount = (events || []).filter(e => {
+        if (e.type !== 'falling' || !e.date) return false;
+        const [y, m, d] = e.date.split('-').map(Number);
+        return selectedDate.getFullYear() === y && selectedDate.getMonth() === (m - 1) && selectedDate.getDate() === d;
+    }).length;
 
     // Pie Data: If no segments (meaning no events processed properly or !hasData), show 100% Gray.
     const pieData = (timelineSegments.length > 0 && hasData) ? timelineSegments : [{ name: 'Empty', value: 1, color: '#e5e7eb' }];
 
-    // Recalculate counts for cards
-    const fallCount = hasData ? dailyEvents.filter(e => e.type === 'falling').length : 0;
-    const sitCount = hasData ? dailyEvents.filter(e => e.type === 'sitting').length : 0;
-    const layCount = hasData ? dailyEvents.filter(e => e.type === 'laying').length : 0;
-
-    // Summary Cards Data (Backgrounds kept pastel for readability)
+    // Summary Cards Data
     const summaryData = [
-        { label: 'Relax', value: `${(sitCount + layCount) * 0.5}h`, icon: Armchair, bg: 'bg-blue-100', text: 'text-gray-600', subText: `Relax: ${(sitCount + layCount) * 0.5}h` },
-        { label: 'Work', value: '0h', icon: Briefcase, bg: 'bg-amber-100', text: 'text-gray-600', subText: 'Work: 0h' },
-        { label: 'Walk', value: '0h', icon: Footprints, bg: 'bg-emerald-100', text: 'text-gray-600', subText: 'Walk: 0h' },
+        { label: 'Relax', value: `${relaxHours}h`, icon: Armchair, bg: 'bg-blue-100', text: 'text-gray-600', subText: `Relax: ${relaxHours}h` },
+        { label: 'Work', value: `${workHours}h`, icon: Briefcase, bg: 'bg-amber-100', text: 'text-gray-600', subText: `Work: ${workHours}h` },
+        { label: 'Walk', value: `${walkHours}h`, icon: Footprints, bg: 'bg-emerald-100', text: 'text-gray-600', subText: `Walk: ${walkHours}h` },
         { label: 'Falls', value: `${fallCount}`, icon: AlertTriangle, bg: 'bg-red-300', text: 'text-red-900', subText: `Falls: ${fallCount}`, isAlert: true }
     ];
 
@@ -218,7 +271,12 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ events, onOpenProfi
                         {formatDate(selectedDate)}
                     </div>
                     <button
-                        onClick={() => setShowDatePicker(!showDatePicker)}
+                        onClick={() => {
+                            if (!showDatePicker) {
+                                setCurrentMonth(new Date()); // Reset to current month when opening
+                            }
+                            setShowDatePicker(!showDatePicker);
+                        }}
                         className="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-md text-xs font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                     >
                         choose date
