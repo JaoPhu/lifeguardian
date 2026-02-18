@@ -1,6 +1,8 @@
-# LifeGuardian
+# LifeGuardian (Design Prototype)
 
-LifeGuardian is a web-based prototype application for AI-powered office syndrome monitoring and event detection. It uses computer vision to analyze postures and detect critical events such as falling, long-term sitting, or laying down to ensure workplace safety and health.
+**Note: This repository is a Design Prototype.** 🎨 It is intended for visual verification, UI/UX flow demonstration, and interaction testing. This is not the production-ready application.
+
+LifeGuardian is a web-based **design prototype** application for AI-powered office syndrome monitoring and event detection. It uses computer vision to analyze postures and detect critical events such as falling, long-term sitting, or laying down to ensure workplace safety and health.
 
 ## 🛠️ Tech Stack & Languages
 
@@ -79,7 +81,7 @@ src/
 ## 🇹🇭 สำหรับนักพัฒนา (Thai Summary)
 
 **LifeGuardian คืออะไร?**
-โปรเจกต์นี้เป็นตัวต้นแบบ (Prototype) ระบบตรวจจับท่าทางและอาการออฟฟิศซินโดรมด้วย AI ผ่านเว็บเบราว์เซอร์ โดยเน้นความง่ายในการใช้งานและประสิทธิภาพสูง
+**ย้ำ: นี่คือโปรเจกต์ตัวต้นแบบเชิงดีไซน์ (Design Prototype)** 🎨 พัฒนาขึ้นเพื่อทดสอบ UI/UX, การขยับของ Animation, และ Flow การใช้งานเบื้องต้น ก่อนจะนำไปพัฒนาเป็นระบบจริง
 
 **ภาษาและเทคโนโลยี:**
 *   **TypeScript (React/TSX)**: ใช้เป็นภาษาหลักในการเขียน UI และ Logic ทั้งหมด
