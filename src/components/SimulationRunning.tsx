@@ -192,7 +192,10 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
     };
 
     const handleVideoEnded = () => {
-        onStop();
+        if (videoRef.current) {
+            videoRef.current.currentTime = 0;
+            videoRef.current.play().catch(e => console.error("Video replay failed:", e));
+        }
     };
 
     // --- MediaPipe Detection Loop ---
@@ -218,20 +221,20 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                 [0, 11], [0, 12]                        // Head to shoulders
             ];
 
-            const lineColor = isAlert ? '#ef4444' : '#06b6d4'; // Red for falling, Cyan for normal
-            const jointColor = isAlert ? '#f87171' : '#38bdf8';
+            const lineColor = isAlert ? '#ff1111' : '#00e5ff'; // Bright Red for alert/falling, Bright Cyan for normal
+            const jointColor = isAlert ? '#ff6666' : '#66ffff';
 
             ctx.save();
-            ctx.lineWidth = Math.max(2, Math.round(width / 300));
+            ctx.lineWidth = Math.max(3, Math.round(width / 150));
             ctx.strokeStyle = lineColor;
             ctx.shadowColor = lineColor;
-            ctx.shadowBlur = 6;
+            ctx.shadowBlur = 10;
 
             connections.forEach(([i, j]) => {
                 const p1 = landmarks[i];
                 const p2 = landmarks[j];
 
-                if (p1 && p2 && (p1.visibility === undefined || p1.visibility > 0.2) && (p2.visibility === undefined || p2.visibility > 0.2)) {
+                if (p1 && p2 && (p1.visibility === undefined || p1.visibility > 0.15) && (p2.visibility === undefined || p2.visibility > 0.15)) {
                     ctx.beginPath();
                     ctx.moveTo(p1.x * width, p1.y * height);
                     ctx.lineTo(p2.x * width, p2.y * height);
@@ -241,15 +244,15 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
 
             ctx.shadowBlur = 0;
             landmarks.forEach((p, idx) => {
-                if (p && (p.visibility === undefined || p.visibility > 0.2)) {
+                if (p && (p.visibility === undefined || p.visibility > 0.15)) {
                     const isMajor = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].includes(idx);
-                    const radius = Math.max(3, Math.round((isMajor ? 5 : 3) * (width / 600)));
+                    const radius = Math.max(4, Math.round((isMajor ? 6 : 4) * (width / 400)));
 
                     ctx.beginPath();
                     ctx.arc(p.x * width, p.y * height, radius, 0, 2 * Math.PI);
                     ctx.fillStyle = jointColor;
                     ctx.fill();
-                    ctx.lineWidth = 1.5;
+                    ctx.lineWidth = 2;
                     ctx.strokeStyle = '#ffffff';
                     ctx.stroke();
                 }
