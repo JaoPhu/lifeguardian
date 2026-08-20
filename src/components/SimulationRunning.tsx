@@ -172,6 +172,14 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         setVideoTimeSec(e.currentTarget.currentTime);
     };
 
+    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newTime = parseFloat(e.target.value);
+        setVideoTimeSec(newTime);
+        if (videoRef.current) {
+            videoRef.current.currentTime = newTime;
+        }
+    };
+
     const handleVideoLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
         const duration = e.currentTarget.duration;
         setVideoDuration(duration);
@@ -559,15 +567,25 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                         <div className="text-[10px] font-bold text-gray-400 mt-0.5">{formattedDate}</div>
                     </div>
 
-                    {/* Slider */}
-                    <div className="w-full relative h-6 flex items-center mb-1">
-                        <div className="absolute inset-x-0 h-1 bg-gray-200 rounded-full"></div>
+                    {/* Interactive Slider */}
+                    <div className="w-full relative h-6 flex items-center mb-1 group cursor-pointer">
+                        <div className="absolute inset-x-0 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-[#0D9488] rounded-full"
+                                style={{ width: `${progress}%` }}
+                            ></div>
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max={videoDuration || 100}
+                            step="0.01"
+                            value={videoTimeSec}
+                            onChange={handleSeek}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
                         <div
-                            className="absolute left-0 h-1 bg-gray-400 rounded-full transition-all duration-300 ease-linear"
-                            style={{ width: `${progress}%` }}
-                        ></div>
-                        <div
-                            className="absolute w-4 h-4 bg-gray-400 rounded-full border-2 border-white shadow-md transition-all duration-300 ease-linear"
+                            className="absolute w-4 h-4 bg-[#0D9488] rounded-full border-2 border-white shadow-md pointer-events-none transition-transform group-hover:scale-125"
                             style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
                         ></div>
                     </div>
