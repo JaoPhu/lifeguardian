@@ -15,10 +15,10 @@ export class PoseDetectionService {
     private poseLandmarker: PoseLandmarker | null = null;
     private runningMode: "IMAGE" | "VIDEO" = "VIDEO";
     private lastLandmarks: PoseLandmark[] | null = null;
-    private smoothingFactor: number = 0.35; // Balance between lag and stability (0.1 = very stable but laggy, 0.9 = jittery but fast)
+    private smoothingFactor: number = 0.85; // High factor for responsive, lag-free tracking of real video motion
     private initPromise: Promise<void> | null = null;
 
-    // Initialize the model with GPU/CPU fallback and singleton promise
+    // Initialize the model with CPU/GPU fallback and singleton promise
     async initialize(): Promise<void> {
         if (this.poseLandmarker) return;
         if (this.initPromise) return this.initPromise;
@@ -32,29 +32,29 @@ export class PoseDetectionService {
                 this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
                     baseOptions: {
                         modelAssetPath: modelUrl,
-                        delegate: "GPU"
+                        delegate: "CPU"
                     },
                     runningMode: this.runningMode,
                     numPoses: 1
                 });
-                console.log("PoseLandmarker initialized with GPU!");
-            } catch (gpuError) {
-                console.warn("GPU init failed, attempting CPU fallback:", gpuError);
+                console.log("PoseLandmarker initialized with CPU!");
+            } catch (cpuError) {
+                console.warn("CPU init failed, attempting GPU fallback:", cpuError);
                 try {
                     const vision = await FilesetResolver.forVisionTasks(wasmUrl);
                     this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
                         baseOptions: {
                             modelAssetPath: modelUrl,
-                            delegate: "CPU"
+                            delegate: "GPU"
                         },
                         runningMode: this.runningMode,
                         numPoses: 1
                     });
-                    console.log("PoseLandmarker initialized with CPU!");
-                } catch (cpuError) {
-                    console.error("PoseLandmarker failed on both GPU and CPU:", cpuError);
+                    console.log("PoseLandmarker initialized with GPU!");
+                } catch (gpuError) {
+                    console.error("PoseLandmarker failed on both CPU and GPU:", gpuError);
                     this.initPromise = null;
-                    throw cpuError;
+                    throw gpuError;
                 }
             }
         })();
