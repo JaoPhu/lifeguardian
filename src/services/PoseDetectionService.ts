@@ -24,43 +24,40 @@ export class PoseDetectionService {
         if (this.initPromise) return this.initPromise;
 
         this.initPromise = (async () => {
-            const wasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
-            const modelUrl = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+            const isGithubPages = window.location.hostname.includes('github.io');
+            const basePath = isGithubPages ? '/lifeguardian_prototype/' : '/';
+            const localWasmUrl = `${basePath}wasm`;
+            const localModelUrl = `${basePath}models/pose_landmarker_lite.task`;
+            const cdnWasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+            const cdnModelUrl = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+
+            const options = (modelUrl: string) => ({
+                baseOptions: {
+                    modelAssetPath: modelUrl,
+                    delegate: "CPU" as const
+                },
+                runningMode: this.runningMode,
+                numPoses: 1,
+                minPoseDetectionConfidence: 0.1,
+                minPosePresenceConfidence: 0.1,
+                minTrackingConfidence: 0.1
+            });
 
             try {
-                const vision = await FilesetResolver.forVisionTasks(wasmUrl);
-                this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: modelUrl,
-                        delegate: "CPU"
-                    },
-                    runningMode: this.runningMode,
-                    numPoses: 1,
-                    minPoseDetectionConfidence: 0.15,
-                    minPosePresenceConfidence: 0.15,
-                    minTrackingConfidence: 0.15
-                });
-                console.log("PoseLandmarker initialized with CPU!");
-            } catch (cpuError) {
-                console.warn("CPU init failed, attempting GPU fallback:", cpuError);
+                // Try local assets first
+                const vision = await FilesetResolver.forVisionTasks(localWasmUrl);
+                this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, options(localModelUrl));
+                console.log("PoseLandmarker initialized with local assets!");
+            } catch (localError) {
+                console.warn("Local assets init failed, attempting CDN fallback:", localError);
                 try {
-                    const vision = await FilesetResolver.forVisionTasks(wasmUrl);
-                    this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                        baseOptions: {
-                            modelAssetPath: modelUrl,
-                            delegate: "GPU"
-                        },
-                        runningMode: this.runningMode,
-                        numPoses: 1,
-                        minPoseDetectionConfidence: 0.15,
-                        minPosePresenceConfidence: 0.15,
-                        minTrackingConfidence: 0.15
-                    });
-                    console.log("PoseLandmarker initialized with GPU!");
-                } catch (gpuError) {
-                    console.error("PoseLandmarker failed on both CPU and GPU:", gpuError);
+                    const vision = await FilesetResolver.forVisionTasks(cdnWasmUrl);
+                    this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, options(cdnModelUrl));
+                    console.log("PoseLandmarker initialized with CDN!");
+                } catch (cdnError) {
+                    console.error("PoseLandmarker failed on both local and CDN assets:", cdnError);
                     this.initPromise = null;
-                    throw gpuError;
+                    throw cdnError;
                 }
             }
         })();
