@@ -35,7 +35,10 @@ export class PoseDetectionService {
                         delegate: "CPU"
                     },
                     runningMode: this.runningMode,
-                    numPoses: 1
+                    numPoses: 1,
+                    minPoseDetectionConfidence: 0.15,
+                    minPosePresenceConfidence: 0.15,
+                    minTrackingConfidence: 0.15
                 });
                 console.log("PoseLandmarker initialized with CPU!");
             } catch (cpuError) {
@@ -48,7 +51,10 @@ export class PoseDetectionService {
                             delegate: "GPU"
                         },
                         runningMode: this.runningMode,
-                        numPoses: 1
+                        numPoses: 1,
+                        minPoseDetectionConfidence: 0.15,
+                        minPosePresenceConfidence: 0.15,
+                        minTrackingConfidence: 0.15
                     });
                     console.log("PoseLandmarker initialized with GPU!");
                 } catch (gpuError) {
