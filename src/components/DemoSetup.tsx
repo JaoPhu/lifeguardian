@@ -243,11 +243,64 @@ const DemoSetup: React.FC<DemoSetupProps> = ({ onStart, onOpenNotifications, has
                                 <button className="w-12 h-12 bg-gray-400/50 rounded-full flex items-center justify-center pointer-events-none">
                                     <Plus className="w-6 h-6 text-white" />
                                 </button>
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium pointer-events-none">Upload video</span>
                             </>
                         )}
                     </div>
-                    <div className="h-4"></div>
+                    {/* Preset Sample Clips */}
+                    <div className="px-2 pb-2 flex flex-col gap-1.5 mt-2">
+                        <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500">หรือเลือกคลิปทดสอบตัวอย่าง (Sample Clips):</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewUrl('sample_videos/lom.mp4');
+                                    setThumbnailUrl(null);
+                                }}
+                                className={clsx(
+                                    "py-1.5 px-1 rounded-lg text-[10px] font-bold border transition-all text-center",
+                                    previewUrl?.includes('lom.mp4')
+                                        ? "bg-red-500 text-white border-red-600 shadow-sm"
+                                        : "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900 hover:bg-red-100"
+                                )}
+                            >
+                                🚨 คลิปตัวอย่าง: ล้ม
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewUrl('sample_videos/sit.mp4');
+                                    setThumbnailUrl(null);
+                                }}
+                                className={clsx(
+                                    "py-1.5 px-1 rounded-lg text-[10px] font-bold border transition-all text-center",
+                                    previewUrl?.includes('sit.mp4')
+                                        ? "bg-[#0D9488] text-white border-teal-600 shadow-sm"
+                                        : "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-900 hover:bg-teal-100"
+                                )}
+                            >
+                                🪑 คลิปตัวอย่าง: นั่ง
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewUrl('sample_videos/stand.mp4');
+                                    setThumbnailUrl(null);
+                                }}
+                                className={clsx(
+                                    "py-1.5 px-1 rounded-lg text-[10px] font-bold border transition-all text-center",
+                                    previewUrl?.includes('stand.mp4')
+                                        ? "bg-blue-500 text-white border-blue-600 shadow-sm"
+                                        : "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 hover:bg-blue-100"
+                                )}
+                            >
+                                🧍 คลิปตัวอย่าง: ยืน
+                            </button>
+                        </div>
+                    </div>
+                    <div className="h-2"></div>
                 </div>
 
                 {/* Camera Name */}

@@ -328,7 +328,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
         };
 
         const animate = () => {
-            if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended && isPlaying) {
+            if (videoRef.current && canvasRef.current && isPlaying) {
                 const video = videoRef.current;
                 const canvas = canvasRef.current;
 
@@ -570,6 +570,8 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                                     className="w-full h-full object-contain"
                                     autoPlay
                                     playsInline
+                                    muted
+                                    loop
                                     crossOrigin={config.videoUrl?.startsWith('blob:') ? undefined : "anonymous"}
                                     onTimeUpdate={handleVideoTimeUpdate}
                                     onLoadedMetadata={(e) => {
