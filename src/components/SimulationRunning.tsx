@@ -258,6 +258,75 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
             ctx.restore();
         };
 
+        const generateDemoSkeleton = (posture: string, timeSec: number): PoseLandmark[] => {
+            const t = timeSec * 3;
+            const wave = Math.sin(t) * 0.015;
+            const legMove = Math.sin(t * 2) * 0.025;
+
+            let head = { x: 0.5, y: 0.25 };
+            let lShoulder = { x: 0.42, y: 0.38 };
+            let rShoulder = { x: 0.58, y: 0.38 };
+            let lElbow = { x: 0.37, y: 0.49 };
+            let rElbow = { x: 0.63, y: 0.49 };
+            let lWrist = { x: 0.35, y: 0.58 };
+            let rWrist = { x: 0.65, y: 0.58 };
+            let lHip = { x: 0.44, y: 0.6 };
+            let rHip = { x: 0.56, y: 0.6 };
+            let lKnee = { x: 0.44, y: 0.75 };
+            let rKnee = { x: 0.56, y: 0.75 };
+            let lAnkle = { x: 0.44, y: 0.9 };
+            let rAnkle = { x: 0.56, y: 0.9 };
+
+            if (posture === 'sitting') {
+                head = { x: 0.5 + wave, y: 0.32 };
+                lShoulder = { x: 0.43, y: 0.44 };
+                rShoulder = { x: 0.57, y: 0.44 };
+                lHip = { x: 0.44, y: 0.64 };
+                rHip = { x: 0.56, y: 0.64 };
+                lKnee = { x: 0.39, y: 0.74 };
+                rKnee = { x: 0.61, y: 0.74 };
+                lAnkle = { x: 0.39, y: 0.88 };
+                rAnkle = { x: 0.61, y: 0.88 };
+            } else if (posture === 'walking') {
+                head = { x: 0.5 + wave, y: 0.25 };
+                lKnee = { x: 0.44 + legMove, y: 0.75 };
+                rKnee = { x: 0.56 - legMove, y: 0.75 };
+                lAnkle = { x: 0.44 + legMove * 1.2, y: 0.9 };
+                rAnkle = { x: 0.56 - legMove * 1.2, y: 0.9 };
+            } else if (posture === 'laying' || posture === 'falling') {
+                head = { x: 0.22, y: 0.75 };
+                lShoulder = { x: 0.32, y: 0.73 };
+                rShoulder = { x: 0.32, y: 0.77 };
+                lElbow = { x: 0.42, y: 0.72 };
+                rElbow = { x: 0.42, y: 0.78 };
+                lWrist = { x: 0.5, y: 0.72 };
+                rWrist = { x: 0.5, y: 0.78 };
+                lHip = { x: 0.58, y: 0.73 };
+                rHip = { x: 0.58, y: 0.77 };
+                lKnee = { x: 0.72, y: 0.74 };
+                rKnee = { x: 0.72, y: 0.76 };
+                lAnkle = { x: 0.86, y: 0.74 };
+                rAnkle = { x: 0.86, y: 0.76 };
+            }
+
+            const points: PoseLandmark[] = Array(33).fill(null).map(() => ({ x: 0.5, y: 0.5, z: 0, visibility: 1 }));
+            points[0] = { x: head.x, y: head.y, z: 0, visibility: 1 };
+            points[11] = { x: lShoulder.x, y: lShoulder.y, z: 0, visibility: 1 };
+            points[12] = { x: rShoulder.x, y: rShoulder.y, z: 0, visibility: 1 };
+            points[13] = { x: lElbow.x, y: lElbow.y, z: 0, visibility: 1 };
+            points[14] = { x: rElbow.x, y: rElbow.y, z: 0, visibility: 1 };
+            points[15] = { x: lWrist.x, y: lWrist.y, z: 0, visibility: 1 };
+            points[16] = { x: rWrist.x, y: rWrist.y, z: 0, visibility: 1 };
+            points[23] = { x: lHip.x, y: lHip.y, z: 0, visibility: 1 };
+            points[24] = { x: rHip.x, y: rHip.y, z: 0, visibility: 1 };
+            points[25] = { x: lKnee.x, y: lKnee.y, z: 0, visibility: 1 };
+            points[26] = { x: rKnee.x, y: rKnee.y, z: 0, visibility: 1 };
+            points[27] = { x: lAnkle.x, y: lAnkle.y, z: 0, visibility: 1 };
+            points[28] = { x: rAnkle.x, y: rAnkle.y, z: 0, visibility: 1 };
+
+            return points;
+        };
+
         const animate = () => {
             if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended && isPlaying) {
                 const video = videoRef.current;
@@ -270,19 +339,24 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                     }
 
                     const startTimeMs = performance.now();
-                    const landmarks = poseDetectionService.detectForVideo(video, startTimeMs);
+                    let landmarks = poseDetectionService.detectForVideo(video, startTimeMs);
+
+                    let isDemoFallback = false;
+                    if (!landmarks) {
+                        landmarks = generateDemoSkeleton(stickmanPosture, video.currentTime);
+                        isDemoFallback = true;
+                    }
 
                     const ctx = canvas.getContext('2d');
-                    if (ctx) {
+                    if (ctx && landmarks) {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                        if (landmarks) {
-                            // 3. Logic Check
+                        let detectedPosture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling' = stickmanPosture;
+
+                        if (!isDemoFallback) {
                             const isLaying = poseDetectionService.isLaying(landmarks as any);
                             const isStanding = poseDetectionService.isStanding(landmarks as any);
                             const isWalking = poseDetectionService.isWalking(landmarks as any);
-
-                            let detectedPosture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling' = 'sitting';
 
                             if (isLaying) {
                                 const lastState = postureHistory.current?.[postureHistory.current.length - 1];
@@ -298,31 +372,32 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                             } else {
                                 detectedPosture = 'sitting';
                             }
+                        }
 
-                            // Draw Skeleton & Status Badge
-                            const isAlert = detectedPosture === 'falling' || detectedPosture === 'laying';
-                            drawSkeleton(ctx, landmarks, isAlert);
+                        // Draw Skeleton & Status Badge
+                        const isAlert = detectedPosture === 'falling' || detectedPosture === 'laying';
+                        drawSkeleton(ctx, landmarks, isAlert);
 
-                            ctx.save();
-                            const fontSize = Math.max(12, Math.round(canvas.width / 40));
-                            ctx.font = `bold ${fontSize}px sans-serif`;
-                            const badgeText = `AI: ${detectedPosture.toUpperCase()}`;
-                            const metrics = ctx.measureText(badgeText);
-                            const padX = 12;
-                            const padY = 8;
+                        ctx.save();
+                        const fontSize = Math.max(12, Math.round(canvas.width / 40));
+                        ctx.font = `bold ${fontSize}px sans-serif`;
+                        const badgeText = isDemoFallback ? `AI DEMO: ${detectedPosture.toUpperCase()}` : `AI: ${detectedPosture.toUpperCase()}`;
+                        const metrics = ctx.measureText(badgeText);
+                        const padX = 12;
+                        const padY = 8;
 
-                            ctx.fillStyle = isAlert ? 'rgba(220, 38, 38, 0.85)' : 'rgba(13, 148, 136, 0.85)';
-                            if (typeof ctx.roundRect === 'function') {
-                                ctx.beginPath();
-                                ctx.roundRect(12, 12, metrics.width + padX * 2, fontSize + padY * 2, 8);
-                                ctx.fill();
-                            } else {
-                                ctx.fillRect(12, 12, metrics.width + padX * 2, fontSize + padY * 2);
-                            }
+                        ctx.fillStyle = isAlert ? 'rgba(220, 38, 38, 0.85)' : 'rgba(13, 148, 136, 0.85)';
+                        if (typeof ctx.roundRect === 'function') {
+                            ctx.beginPath();
+                            ctx.roundRect(12, 12, metrics.width + padX * 2, fontSize + padY * 2, 8);
+                            ctx.fill();
+                        } else {
+                            ctx.fillRect(12, 12, metrics.width + padX * 2, fontSize + padY * 2);
+                        }
 
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillText(badgeText, 12 + padX, 12 + padY + fontSize * 0.8);
-                            ctx.restore();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText(badgeText, 12 + padX, 12 + padY + fontSize * 0.8);
+                        ctx.restore();
 
                             // Filter out jitter
                             let stablePosture = detectedPosture;
@@ -402,10 +477,9 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                             }
                         }
                     }
+                    requestRef.current = requestAnimationFrame(animate);
                 }
             }
-            requestRef.current = requestAnimationFrame(animate);
-        };
 
         requestRef.current = requestAnimationFrame(animate);
 
@@ -510,7 +584,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                                 />
                                 <canvas
                                     ref={canvasRef}
-                                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                                    className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20"
                                 />
                             </>
                         ) : (
