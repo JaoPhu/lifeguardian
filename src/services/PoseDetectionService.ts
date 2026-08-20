@@ -68,15 +68,24 @@ export class PoseDetectionService {
         return this.initPromise;
     }
 
+    private lastTimestampMs: number = -1;
+
     // Detect landmarks for a video frame safely
-    detectForVideo(video: HTMLVideoElement, startTimeMs: number) {
+    detectForVideo(video: HTMLVideoElement, timestampMs: number) {
         if (!this.poseLandmarker) return null;
-        if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+        if (!video || video.readyState < 1 || video.videoWidth === 0 || video.videoHeight === 0) {
             return null;
         }
 
+        // Ensure timestamp is always strictly greater than previous timestamp (MediaPipe requirement)
+        let validTimestampMs = timestampMs;
+        if (validTimestampMs <= this.lastTimestampMs) {
+            validTimestampMs = this.lastTimestampMs + 33;
+        }
+        this.lastTimestampMs = validTimestampMs;
+
         try {
-            const result = this.poseLandmarker.detectForVideo(video, startTimeMs);
+            const result = this.poseLandmarker.detectForVideo(video, validTimestampMs);
             const currentLandmarks = result?.landmarks?.[0] ?? null;
 
             if (!currentLandmarks) {

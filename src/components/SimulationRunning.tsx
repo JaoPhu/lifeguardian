@@ -294,25 +294,26 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
 
         const animate = () => {
             if (videoRef.current && canvasRef.current && isPlaying) {
-                const video = videoRef.current;
-                const canvas = canvasRef.current;
+                try {
+                    const video = videoRef.current;
+                    const canvas = canvasRef.current;
 
-                if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                    }
+                    if (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0) {
+                        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                        }
 
-                    const timestampMs = Math.round(video.currentTime * 1000);
-                    let landmarks = poseDetectionService.detectForVideo(video, timestampMs);
+                        const timestampMs = Math.round(video.currentTime * 1000);
+                        let landmarks = poseDetectionService.detectForVideo(video, timestampMs);
 
-                    if (!landmarks || landmarks.length === 0) {
-                        landmarks = getFallbackLandmarks(video.currentTime);
-                    }
+                        if (!landmarks || landmarks.length === 0) {
+                            landmarks = getFallbackLandmarks(video.currentTime);
+                        }
 
-                    const ctx = canvas.getContext('2d');
-                    if (ctx && landmarks) {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        const ctx = canvas.getContext('2d');
+                        if (ctx && landmarks) {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
                             const isLaying = poseDetectionService.isLaying(landmarks as any);
                             const isStanding = poseDetectionService.isStanding(landmarks as any);
                             const isWalking = poseDetectionService.isWalking(landmarks as any);
@@ -436,8 +437,11 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                                 });
                             }
                         }
-                    requestRef.current = requestAnimationFrame(animate);
+                    }
+                } catch (err) {
+                    console.error("Animate loop error:", err);
                 }
+                requestRef.current = requestAnimationFrame(animate);
             }
         };
 
