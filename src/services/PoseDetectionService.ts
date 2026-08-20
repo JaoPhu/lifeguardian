@@ -16,55 +16,88 @@ export class PoseDetectionService {
     private runningMode: "IMAGE" | "VIDEO" = "VIDEO";
     private lastLandmarks: PoseLandmark[] | null = null;
     private smoothingFactor: number = 0.35; // Balance between lag and stability (0.1 = very stable but laggy, 0.9 = jittery but fast)
+    private initPromise: Promise<void> | null = null;
 
-    // Initialize the model
-    async initialize() {
-        if (this.poseLandmarker) return; // Already initialized
+    // Initialize the model with GPU/CPU fallback and singleton promise
+    async initialize(): Promise<void> {
+        if (this.poseLandmarker) return;
+        if (this.initPromise) return this.initPromise;
 
-        const vision = await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-        );
+        this.initPromise = (async () => {
+            const wasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+            const modelUrl = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
-        this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-                delegate: "GPU"
-            },
-            runningMode: this.runningMode,
-            numPoses: 1
-        });
+            try {
+                const vision = await FilesetResolver.forVisionTasks(wasmUrl);
+                this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: modelUrl,
+                        delegate: "GPU"
+                    },
+                    runningMode: this.runningMode,
+                    numPoses: 1
+                });
+                console.log("PoseLandmarker initialized with GPU!");
+            } catch (gpuError) {
+                console.warn("GPU init failed, attempting CPU fallback:", gpuError);
+                try {
+                    const vision = await FilesetResolver.forVisionTasks(wasmUrl);
+                    this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+                        baseOptions: {
+                            modelAssetPath: modelUrl,
+                            delegate: "CPU"
+                        },
+                        runningMode: this.runningMode,
+                        numPoses: 1
+                    });
+                    console.log("PoseLandmarker initialized with CPU!");
+                } catch (cpuError) {
+                    console.error("PoseLandmarker failed on both GPU and CPU:", cpuError);
+                    this.initPromise = null;
+                    throw cpuError;
+                }
+            }
+        })();
 
-        console.log("PoseLandmarker initialized!");
+        return this.initPromise;
     }
 
-    // Detect landmarks for a video frame
+    // Detect landmarks for a video frame safely
     detectForVideo(video: HTMLVideoElement, startTimeMs: number) {
         if (!this.poseLandmarker) return null;
-
-        const result = this.poseLandmarker.detectForVideo(video, startTimeMs);
-        const currentLandmarks = result.landmarks[0] ?? null;
-
-        if (!currentLandmarks) {
-            this.lastLandmarks = null;
+        if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
             return null;
         }
 
-        // Apply Smoothing (Exponential Moving Average)
-        if (!this.lastLandmarks || this.lastLandmarks.length !== currentLandmarks.length) {
-            this.lastLandmarks = currentLandmarks;
-        } else {
-            this.lastLandmarks = currentLandmarks.map((point, i) => {
-                const lastPoint = this.lastLandmarks![i];
-                return {
-                    x: point.x * this.smoothingFactor + lastPoint.x * (1 - this.smoothingFactor),
-                    y: point.y * this.smoothingFactor + lastPoint.y * (1 - this.smoothingFactor),
-                    z: point.z * this.smoothingFactor + lastPoint.z * (1 - this.smoothingFactor),
-                    visibility: point.visibility * this.smoothingFactor + lastPoint.visibility * (1 - this.smoothingFactor)
-                };
-            });
-        }
+        try {
+            const result = this.poseLandmarker.detectForVideo(video, startTimeMs);
+            const currentLandmarks = result?.landmarks?.[0] ?? null;
 
-        return this.lastLandmarks;
+            if (!currentLandmarks) {
+                this.lastLandmarks = null;
+                return null;
+            }
+
+            // Apply Smoothing (Exponential Moving Average)
+            if (!this.lastLandmarks || this.lastLandmarks.length !== currentLandmarks.length) {
+                this.lastLandmarks = currentLandmarks;
+            } else {
+                this.lastLandmarks = currentLandmarks.map((point, i) => {
+                    const lastPoint = this.lastLandmarks![i];
+                    return {
+                        x: point.x * this.smoothingFactor + lastPoint.x * (1 - this.smoothingFactor),
+                        y: point.y * this.smoothingFactor + lastPoint.y * (1 - this.smoothingFactor),
+                        z: point.z * this.smoothingFactor + lastPoint.z * (1 - this.smoothingFactor),
+                        visibility: (point.visibility ?? 1) * this.smoothingFactor + (lastPoint.visibility ?? 1) * (1 - this.smoothingFactor)
+                    };
+                });
+            }
+
+            return this.lastLandmarks;
+        } catch (err) {
+            console.warn("detectForVideo error:", err);
+            return null;
+        }
     }
 
     // --- LOGIC: Fall Detection ---

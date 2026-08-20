@@ -198,142 +198,210 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
 
     // --- MediaPipe Detection Loop ---
     useEffect(() => {
-        let drawingUtils: DrawingUtils | null = null;
-
         const initAI = async () => {
-            await poseDetectionService.initialize();
-            if (canvasRef.current) {
-                drawingUtils = new DrawingUtils(canvasRef.current.getContext('2d')!);
+            try {
+                await poseDetectionService.initialize();
+            } catch (err) {
+                console.error("Failed to initialize PoseDetectionService in SimulationRunning:", err);
             }
         };
         initAI();
 
+        const drawSkeleton = (ctx: CanvasRenderingContext2D, landmarks: PoseLandmark[], isAlert: boolean) => {
+            const width = ctx.canvas.width;
+            const height = ctx.canvas.height;
+            if (width === 0 || height === 0) return;
+
+            const connections = [
+                [11, 12], [11, 23], [12, 24], [23, 24], // Torso
+                [11, 13], [13, 15], [12, 14], [14, 16], // Arms
+                [23, 25], [25, 27], [24, 26], [26, 28], // Legs
+                [0, 11], [0, 12]                        // Head to shoulders
+            ];
+
+            const lineColor = isAlert ? '#ef4444' : '#06b6d4'; // Red for falling, Cyan for normal
+            const jointColor = isAlert ? '#f87171' : '#38bdf8';
+
+            ctx.save();
+            ctx.lineWidth = Math.max(2, Math.round(width / 300));
+            ctx.strokeStyle = lineColor;
+            ctx.shadowColor = lineColor;
+            ctx.shadowBlur = 6;
+
+            connections.forEach(([i, j]) => {
+                const p1 = landmarks[i];
+                const p2 = landmarks[j];
+
+                if (p1 && p2 && (p1.visibility === undefined || p1.visibility > 0.2) && (p2.visibility === undefined || p2.visibility > 0.2)) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x * width, p1.y * height);
+                    ctx.lineTo(p2.x * width, p2.y * height);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.shadowBlur = 0;
+            landmarks.forEach((p, idx) => {
+                if (p && (p.visibility === undefined || p.visibility > 0.2)) {
+                    const isMajor = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].includes(idx);
+                    const radius = Math.max(3, Math.round((isMajor ? 5 : 3) * (width / 600)));
+
+                    ctx.beginPath();
+                    ctx.arc(p.x * width, p.y * height, radius, 0, 2 * Math.PI);
+                    ctx.fillStyle = jointColor;
+                    ctx.fill();
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
+                }
+            });
+
+            ctx.restore();
+        };
+
         const animate = () => {
             if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended && isPlaying) {
-                // 1. Detect
-                const startTimeMs = performance.now();
-                const landmarks = poseDetectionService.detectForVideo(videoRef.current, startTimeMs);
+                const video = videoRef.current;
+                const canvas = canvasRef.current;
 
-                // 2. Draw
-                const ctx = canvasRef.current.getContext('2d');
-                if (ctx && landmarks) {
-                    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-                    if (drawingUtils) {
-                        drawingUtils.drawLandmarks(landmarks, {
-                            radius: (data: { from?: NormalizedLandmark }) => DrawingUtils.lerp(data.from!.z!, -0.15, 0.1, 5, 1),
-                            color: "white",
-                            lineWidth: 2
-                        });
-                        drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-                            color: "white",
-                            lineWidth: 2
-                        });
+                if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
                     }
 
-                    // 3. Logic Check
-                    const isLaying = poseDetectionService.isLaying(landmarks as any);
-                    const isStanding = poseDetectionService.isStanding(landmarks as any);
-                    const isWalking = poseDetectionService.isWalking(landmarks as any);
+                    const startTimeMs = performance.now();
+                    const landmarks = poseDetectionService.detectForVideo(video, startTimeMs);
 
-                    let detectedPosture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling' = 'sitting';
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    if (isLaying) {
-                        // Logic: If transitioning from standing/walking to laying suddenly, it's a FALL.
-                        const lastState = postureHistory.current?.[postureHistory.current.length - 1];
-                        if (lastState === 'standing' || lastState === 'walking') {
-                            detectedPosture = 'falling';
-                        } else {
-                            detectedPosture = 'laying';
-                        }
-                    } else if (isStanding) {
-                        detectedPosture = 'standing';
-                    } else if (isWalking) {
-                        detectedPosture = 'walking';
-                    } else {
-                        detectedPosture = 'sitting';
-                    }
+                        if (landmarks) {
+                            // 3. Logic Check
+                            const isLaying = poseDetectionService.isLaying(landmarks as any);
+                            const isStanding = poseDetectionService.isStanding(landmarks as any);
+                            const isWalking = poseDetectionService.isWalking(landmarks as any);
 
-                    // Filter out jitter (must be same posture for 3 frames to change, except for falling)
-                    let stablePosture = detectedPosture;
-                    if (postureHistory.current && postureHistory.current.length >= 3 && detectedPosture !== 'falling') {
-                        const last3 = postureHistory.current.slice(-3);
-                        const allSame = last3.every(p => p === detectedPosture);
-                        if (!allSame) {
-                            stablePosture = last3[last3.length - 1] as any;
-                        }
-                    }
+                            let detectedPosture: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling' = 'sitting';
 
-                    // Helper to capture and trigger event
-                    const triggerEvent = (type: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling', critical: boolean = false) => {
-                        // USE SIMULATED TIME
-                        const simTime = new Date(startDateTime.getTime() + (videoRef.current ? videoRef.current.currentTime : videoTimeSec) * config.speed * 60 * 1000);
-                        const timeStr = simTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-                        const y = simTime.getFullYear();
-                        const m = (simTime.getMonth() + 1).toString().padStart(2, '0');
-                        const d = simTime.getDate().toString().padStart(2, '0');
-                        const dateStr = `${y}-${m}-${d}`;
-
-                        let snapshotUrl = '';
-                        if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
-                            try {
-                                const tempCanvas = document.createElement('canvas');
-                                tempCanvas.width = videoRef.current.videoWidth;
-                                tempCanvas.height = videoRef.current.videoHeight;
-                                const tempCtx = tempCanvas.getContext('2d');
-                                if (tempCtx) {
-                                    tempCtx.drawImage(videoRef.current, 0, 0);
-                                    snapshotUrl = tempCanvas.toDataURL('image/jpeg', 0.5);
+                            if (isLaying) {
+                                const lastState = postureHistory.current?.[postureHistory.current.length - 1];
+                                if (lastState === 'standing' || lastState === 'walking') {
+                                    detectedPosture = 'falling';
+                                } else {
+                                    detectedPosture = 'laying';
                                 }
-                            } catch (e) {
-                                console.error("Snapshot generation failed:", e);
+                            } else if (isStanding) {
+                                detectedPosture = 'standing';
+                            } else if (isWalking) {
+                                detectedPosture = 'walking';
+                            } else {
+                                detectedPosture = 'sitting';
+                            }
+
+                            // Draw Skeleton & Status Badge
+                            const isAlert = detectedPosture === 'falling' || detectedPosture === 'laying';
+                            drawSkeleton(ctx, landmarks, isAlert);
+
+                            ctx.save();
+                            const fontSize = Math.max(12, Math.round(canvas.width / 40));
+                            ctx.font = `bold ${fontSize}px sans-serif`;
+                            const badgeText = `AI: ${detectedPosture.toUpperCase()}`;
+                            const metrics = ctx.measureText(badgeText);
+                            const padX = 12;
+                            const padY = 8;
+
+                            ctx.fillStyle = isAlert ? 'rgba(220, 38, 38, 0.85)' : 'rgba(13, 148, 136, 0.85)';
+                            if (typeof ctx.roundRect === 'function') {
+                                ctx.beginPath();
+                                ctx.roundRect(12, 12, metrics.width + padX * 2, fontSize + padY * 2, 8);
+                                ctx.fill();
+                            } else {
+                                ctx.fillRect(12, 12, metrics.width + padX * 2, fontSize + padY * 2);
+                            }
+
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillText(badgeText, 12 + padX, 12 + padY + fontSize * 0.8);
+                            ctx.restore();
+
+                            // Filter out jitter
+                            let stablePosture = detectedPosture;
+                            if (postureHistory.current && postureHistory.current.length >= 3 && detectedPosture !== 'falling') {
+                                const last3 = postureHistory.current.slice(-3);
+                                const allSame = last3.every(p => p === detectedPosture);
+                                if (!allSame) {
+                                    stablePosture = last3[last3.length - 1] as any;
+                                }
+                            }
+
+                            // Helper to capture and trigger event
+                            const triggerEvent = (type: 'standing' | 'walking' | 'sitting' | 'laying' | 'falling', critical: boolean = false) => {
+                                const simTime = new Date(startDateTime.getTime() + (videoRef.current ? videoRef.current.currentTime : videoTimeSec) * config.speed * 60 * 1000);
+                                const timeStr = simTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                                const y = simTime.getFullYear();
+                                const m = (simTime.getMonth() + 1).toString().padStart(2, '0');
+                                const d = simTime.getDate().toString().padStart(2, '0');
+                                const dateStr = `${y}-${m}-${d}`;
+
+                                let snapshotUrl = '';
+                                if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
+                                    try {
+                                        const tempCanvas = document.createElement('canvas');
+                                        tempCanvas.width = videoRef.current.videoWidth;
+                                        tempCanvas.height = videoRef.current.videoHeight;
+                                        const tempCtx = tempCanvas.getContext('2d');
+                                        if (tempCtx) {
+                                            tempCtx.drawImage(videoRef.current, 0, 0);
+                                            snapshotUrl = tempCanvas.toDataURL('image/jpeg', 0.5);
+                                        }
+                                    } catch (e) {
+                                        console.error("Snapshot generation failed:", e);
+                                    }
+                                }
+
+                                const generateDescription = (type: string) => {
+                                    switch (type) {
+                                        case 'falling': return "Sudden postural collapse detected (Critical)";
+                                        case 'standing': return "Subject is in a stable upright position";
+                                        case 'walking': return "Subject is moving in the supervised area";
+                                        case 'sitting': return "Subject is in a stable sitting posture";
+                                        case 'laying': return "Subject is resting in a horizontal position";
+                                        default: return "Activity pattern detected";
+                                    }
+                                };
+
+                                const newEvent: SimulationEvent = {
+                                    id: crypto.randomUUID(),
+                                    type: type,
+                                    timestamp: timeStr,
+                                    date: dateStr,
+                                    description: generateDescription(type),
+                                    snapshotUrl: snapshotUrl,
+                                    isCritical: critical
+                                };
+                                onEventAdded(newEvent);
+                            };
+
+                            // --- SMOOTHING BUFFER ---
+                            if (!postureHistory.current) postureHistory.current = [];
+                            postureHistory.current.push(stablePosture);
+                            if (postureHistory.current.length > 5) postureHistory.current.shift();
+
+                            const isStable = postureHistory.current.length >= 3 && postureHistory.current.every(p => p === detectedPosture);
+
+                            if (isStable) {
+                                setStickmanPosture(prev => {
+                                    if (prev !== detectedPosture) {
+                                        const isCritical = detectedPosture === 'falling';
+                                        triggerEvent(detectedPosture, isCritical);
+                                        if (onPostureChange) onPostureChange(detectedPosture);
+                                    }
+                                    return detectedPosture;
+                                });
                             }
                         }
-
-                        const generateDescription = (type: string) => {
-                            switch (type) {
-                                case 'falling': return "Sudden postural collapse detected (Critical)";
-                                case 'standing': return "Subject is in a stable upright position";
-                                case 'walking': return "Subject is moving in the supervised area";
-                                case 'sitting': return "Subject is in a stable sitting posture";
-                                case 'laying': return "Subject is resting in a horizontal position";
-                                default: return "Activity pattern detected";
-                            }
-                        };
-
-                        const newEvent: SimulationEvent = {
-                            id: crypto.randomUUID(),
-                            type: type,
-                            timestamp: timeStr,
-                            date: dateStr,
-                            description: generateDescription(type),
-                            snapshotUrl: snapshotUrl,
-                            isCritical: critical
-                        };
-                        onEventAdded(newEvent);
-                    };
-
-                    // --- SMOOTHING BUFFER ---
-                    if (!postureHistory.current) postureHistory.current = [];
-                    postureHistory.current.push(stablePosture);
-                    if (postureHistory.current.length > 5) postureHistory.current.shift();
-
-                    // Check if stable (all recent frames match)
-                    const isStable = postureHistory.current.length >= 3 && postureHistory.current.every(p => p === detectedPosture);
-
-                    if (isStable) {
-                        setStickmanPosture(prev => {
-                            if (prev !== detectedPosture) {
-                                // State Changed! Trigger Event.
-                                const isCritical = detectedPosture === 'falling';
-                                triggerEvent(detectedPosture, isCritical);
-
-                                // Notify parent of change
-                                if (onPostureChange) onPostureChange(detectedPosture);
-                            }
-                            return detectedPosture;
-                        });
                     }
                 }
             }
@@ -429,7 +497,7 @@ const SimulationRunning: React.FC<SimulationRunningProps> = ({ config, onStop, o
                                     className="w-full h-full object-contain"
                                     autoPlay
                                     playsInline
-                                    crossOrigin="anonymous" // Allow canvas capture if source permits
+                                    crossOrigin={config.videoUrl?.startsWith('blob:') ? undefined : "anonymous"}
                                     onTimeUpdate={handleVideoTimeUpdate}
                                     onLoadedMetadata={(e) => {
                                         handleVideoLoadedMetadata(e);
