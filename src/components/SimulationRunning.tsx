@@ -3,8 +3,7 @@ import { Bell } from 'lucide-react';
 import clsx from 'clsx';
 import { VideoConfig, SimulationEvent } from '../types';
 import StickmanViewer from './simulation/StickmanViewer';
-import { poseDetectionService } from '../services/PoseDetectionService';
-import { DrawingUtils, PoseLandmarker, NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { poseDetectionService, PoseLandmark } from '../services/PoseDetectionService';
 
 interface SimulationRunningProps {
     config: VideoConfig;
